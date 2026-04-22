@@ -1,0 +1,81 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../../services/api';
+import { Plus, X } from 'lucide-react';
+
+export default function ClassManagement() {
+  const [classes, setClasses] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ subject_id: '', section: '', academic_year: '2025-2026', semester: '2nd', schedule: '', room: '' });
+  const [toast, setToast] = useState(null);
+  const navigate = useNavigate();
+
+  const fetch = () => { api.get('/classes').then(r => setClasses(r.data.data || [])); };
+  useEffect(() => { fetch(); api.get('/subjects').then(r => setSubjects(r.data.data || [])); }, []);
+
+  const showToast = (msg, type='success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    try { await api.post('/classes', form); showToast('Class created.'); setShowModal(false); fetch(); }
+    catch (err) { showToast(err.response?.data?.message || 'Error', 'error'); }
+  };
+
+  const statusBadge = { draft: 'badge-warning', faculty_verified: 'badge-info', officially_released: 'badge-success' };
+
+  return (
+    <div className="animate-in">
+      <div className="page-header flex-between">
+        <div><h1>Class Records</h1><p>Create and manage your classes</p></div>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}><Plus size={18} />New Class</button>
+      </div>
+
+      <div className="table-container">
+        <table>
+          <thead><tr><th>Subject</th><th>Section</th><th>Schedule</th><th>Semester</th><th>Students</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            {classes.map(c => (
+              <tr key={c.id}>
+                <td><strong>{c.subject_code}</strong> – {c.subject_name}</td>
+                <td>{c.section}</td>
+                <td style={{ color: 'var(--text-secondary)' }}>{c.schedule || '—'}</td>
+                <td style={{ color: 'var(--text-secondary)' }}>{c.semester} {c.academic_year}</td>
+                <td>{c.student_count || 0}</td>
+                <td><span className={`badge ${statusBadge[c.grade_status]}`}>{c.grade_status?.replace('_', ' ')}</span></td>
+                <td><button className="btn btn-secondary btn-sm" onClick={() => navigate(`/faculty/classes/${c.id}`)}>Open</button></td>
+              </tr>
+            ))}
+            {!classes.length && <tr><td colSpan={7} className="empty-state">No classes created yet</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+              <h2>Create Class Record</h2>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowModal(false)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="input-group"><label htmlFor="cc-subj">Subject *</label><select id="cc-subj" className="input-field" required value={form.subject_id} onChange={e => setForm({...form, subject_id: e.target.value})}><option value="">Select subject...</option>{subjects.map(s => <option key={s.id} value={s.id}>{s.code} – {s.name}</option>)}</select></div>
+              <div className="grid-2">
+                <div className="input-group"><label htmlFor="cc-sec">Section *</label><input id="cc-sec" className="input-field" required value={form.section} onChange={e => setForm({...form, section: e.target.value})} placeholder="e.g., CE-3A" /></div>
+                <div className="input-group"><label htmlFor="cc-room">Room</label><input id="cc-room" className="input-field" value={form.room} onChange={e => setForm({...form, room: e.target.value})} /></div>
+              </div>
+              <div className="grid-2">
+                <div className="input-group"><label htmlFor="cc-ay">Academic Year *</label><input id="cc-ay" className="input-field" required value={form.academic_year} onChange={e => setForm({...form, academic_year: e.target.value})} /></div>
+                <div className="input-group"><label htmlFor="cc-sem">Semester *</label><select id="cc-sem" className="input-field" value={form.semester} onChange={e => setForm({...form, semester: e.target.value})}><option value="1st">1st</option><option value="2nd">2nd</option><option value="Summer">Summer</option></select></div>
+              </div>
+              <div className="input-group"><label htmlFor="cc-sched">Schedule</label><input id="cc-sched" className="input-field" value={form.schedule} onChange={e => setForm({...form, schedule: e.target.value})} placeholder="e.g., MWF 9:00-10:00 AM" /></div>
+              <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>Create Class</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
+    </div>
+  );
+}

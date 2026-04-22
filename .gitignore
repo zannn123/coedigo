@@ -1,0 +1,26 @@
+# Dependencies
+frontend/node_modules/
+node_modules/
+
+# Build output
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# XAMPP
+*.bak
+
+# Skill/Agent files
+.agent/
+.codex/
+design-system/
