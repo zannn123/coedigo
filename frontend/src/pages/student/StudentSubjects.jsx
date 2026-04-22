@@ -7,7 +7,25 @@ export default function StudentSubjects() {
   const [expandedSubject, setExpandedSubject] = useState(null);
 
   useEffect(() => {
-    api.get('/grades/student').then(r => setGrades(r.data.data || []));
+    let active = true;
+
+    const loadGrades = () => {
+      api.get('/grades/student')
+        .then(r => {
+          if (active) {
+            setGrades(r.data.data || []);
+          }
+        })
+        .catch(() => {});
+    };
+
+    loadGrades();
+    const intervalId = window.setInterval(loadGrades, 15000);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   const statusBadge = {
@@ -138,13 +156,16 @@ export default function StudentSubjects() {
     <div className="animate-in student-subjects-page">
       <div className="page-header">
         <h1>My Subjects</h1>
-        <p>Subject grades, scoring components, and attendance records</p>
+        <p>Live score components, verification status, and attendance records</p>
       </div>
 
       <div className="subjects-overview">
         <div className="subjects-overview-title">
           <span><BookOpen size={16} /> Academic Records</span>
           <h2>{grades.length} Enrolled Subject{grades.length === 1 ? '' : 's'}</h2>
+          <p style={{ margin: '0.5rem 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            Component scores refresh automatically. Final marks appear only after faculty verification.
+          </p>
         </div>
         <div className="subjects-overview-metrics">
           <div>
@@ -203,6 +224,7 @@ export default function StudentSubjects() {
                       {termGroup.subjects.map(subject => {
                         const key = getSubjectKey(subject);
                         const isOpen = expandedSubject === key;
+                        const canViewFinalGrade = subject.can_view_final_grade ?? subject.grade_status !== 'draft';
                         const attendanceTotal = numberValue(subject.attendance_summary?.total_points);
                         const attendancePossible = numberValue(subject.attendance_summary?.possible_points);
 
@@ -222,11 +244,13 @@ export default function StudentSubjects() {
                             <div className="subject-kpi-strip">
                               <div>
                                 <span>Weighted</span>
-                                <strong>{formatPercent(subject.weighted_score)}</strong>
+                                <strong>{canViewFinalGrade ? formatPercent(subject.weighted_score) : 'Pending'}</strong>
                               </div>
                               <div>
                                 <span>Final Grade</span>
-                                <strong style={{ color: gradeColor(subject.final_grade) }}>{formatGrade(subject.final_grade)}</strong>
+                                <strong style={{ color: canViewFinalGrade ? gradeColor(subject.final_grade) : 'var(--text-muted)' }}>
+                                  {canViewFinalGrade ? formatGrade(subject.final_grade) : 'Pending'}
+                                </strong>
                               </div>
                               <div>
                                 <span>Attendance</span>
@@ -255,11 +279,22 @@ export default function StudentSubjects() {
 
                             {isOpen && (
                               <div className="subject-detail-panel" id={detailId(key)}>
+                                {!canViewFinalGrade && (
+                                  <div style={{ marginBottom:'1rem', padding:'0.875rem 1rem', border:'1px solid var(--border)', borderRadius:'var(--radius-md)', background:'var(--bg-surface)', color:'var(--text-secondary)' }}>
+                                    Your faculty has encoded live score details for this subject. Final grade, remarks, and weighted totals will appear after the class is marked as verified.
+                                  </div>
+                                )}
+
                                 <div className="metric-strip">
                                   <div><strong>{formatPercent(subject.major_exam_avg)}</strong><span>Major Exams</span></div>
                                   <div><strong>{formatPercent(subject.quiz_avg)}</strong><span>Quizzes</span></div>
                                   <div><strong>{formatPercent(subject.project_avg)}</strong><span>Projects / Attendance</span></div>
-                                  <div><strong style={{ color: gradeColor(subject.final_grade) }}>{formatGrade(subject.final_grade)}</strong><span>Final Grade</span></div>
+                                  <div>
+                                    <strong style={{ color: canViewFinalGrade ? gradeColor(subject.final_grade) : 'var(--text-muted)' }}>
+                                      {canViewFinalGrade ? formatGrade(subject.final_grade) : 'Pending'}
+                                    </strong>
+                                    <span>Final Grade</span>
+                                  </div>
                                 </div>
 
                                 <div className="detail-section">
@@ -290,7 +325,7 @@ export default function StudentSubjects() {
                                             </tr>
                                           );
                                         })}
-                                        {!subject.components?.length && <tr><td colSpan={6} className="empty-state">No released component details yet</td></tr>}
+                                        {!subject.components?.length && <tr><td colSpan={6} className="empty-state">No live scores encoded yet</td></tr>}
                                       </tbody>
                                     </table>
                                   </div>
@@ -322,7 +357,7 @@ export default function StudentSubjects() {
                                       );
                                     })}
                                     {!subject.components?.length && (
-                                      <div className="empty-state" style={{ padding: '1rem' }}>No released component details yet</div>
+                                      <div className="empty-state" style={{ padding: '1rem' }}>No live scores encoded yet</div>
                                     )}
                                   </div>
                                 </div>

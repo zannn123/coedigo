@@ -105,6 +105,27 @@ CREATE TABLE IF NOT EXISTS enrollments (
 ) ENGINE=InnoDB;
 
 -- ============================================================
+-- ATTENDANCE RECORDS TABLE
+-- Dated attendance entries per enrolled student
+-- Each present mark earns 1 point toward attendance
+-- ============================================================
+CREATE TABLE IF NOT EXISTS attendance_records (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    enrollment_id INT NOT NULL,
+    attendance_date DATE NOT NULL,
+    status ENUM('present', 'absent') NOT NULL DEFAULT 'absent',
+    points DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT 'Present = 1 point, absent = 0',
+    encoded_by INT NOT NULL,
+    encoded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE,
+    FOREIGN KEY (encoded_by) REFERENCES users(id) ON DELETE RESTRICT,
+    UNIQUE KEY uk_attendance_entry (enrollment_id, attendance_date),
+    INDEX idx_attendance_enrollment (enrollment_id),
+    INDEX idx_attendance_date (attendance_date)
+) ENGINE=InnoDB;
+
+-- ============================================================
 -- GRADE COMPONENTS TABLE
 -- Individual score entries per student per class
 -- ============================================================
@@ -161,6 +182,31 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user_read (user_id, is_read),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- ACCOUNT UPDATE REQUESTS TABLE
+-- Admin-reviewed requests for locked account field changes
+-- ============================================================
+CREATE TABLE IF NOT EXISTS account_update_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    requester_user_id INT NOT NULL,
+    request_type VARCHAR(50) NOT NULL,
+    current_email VARCHAR(255) DEFAULT NULL,
+    current_contact_number VARCHAR(20) DEFAULT NULL,
+    requested_email VARCHAR(255) DEFAULT NULL,
+    requested_contact_number VARCHAR(20) DEFAULT NULL,
+    note TEXT NOT NULL,
+    status ENUM('pending', 'done', 'cancelled') NOT NULL DEFAULT 'pending',
+    admin_note TEXT DEFAULT NULL,
+    resolved_by INT DEFAULT NULL,
+    resolved_at DATETIME DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (requester_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_requester_status (requester_user_id, status),
     INDEX idx_created (created_at)
 ) ENGINE=InnoDB;
 
@@ -230,4 +276,12 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 ('quiz_weight', '30', 'Weight percentage for quizzes'),
 ('project_weight', '30', 'Weight percentage for projects/assignments/attendance'),
 ('passing_grade', '3.00', 'Maximum passing grade value'),
-('grade_scale', '1.00,1.25,1.50,1.75,2.00,2.25,2.50,2.75,3.00,5.00', 'Available grade values');
+('grade_scale', '1.00,1.25,1.50,1.75,2.00,2.25,2.50,2.75,3.00,5.00', 'Available grade values'),
+('smtp_host', 'smtp.gmail.com', 'SMTP host for Gmail or another mail provider'),
+('smtp_port', '465', 'SMTP port'),
+('smtp_username', '', 'SMTP username or Gmail address'),
+('smtp_password', '', 'SMTP password or Gmail app password'),
+('smtp_encryption', 'ssl', 'SMTP encryption: ssl, tls, or none'),
+('mail_from_address', '', 'Sender email address; leave blank to use the SMTP username'),
+('mail_from_name', 'COEDIGO', 'Display name for outgoing emails'),
+('mail_reply_to', '', 'Reply-to address for outgoing emails');

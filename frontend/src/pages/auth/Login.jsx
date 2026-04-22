@@ -1,8 +1,24 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { LogIn, Eye, EyeOff } from 'lucide-react';
 import './Login.css';
+
+const PH_TIME_ZONE = 'Asia/Manila';
+
+function getPhilippineHour() {
+  return Number(new Intl.DateTimeFormat('en-US', {
+    timeZone: PH_TIME_ZONE,
+    hour: 'numeric',
+    hourCycle: 'h23',
+  }).format(new Date()));
+}
+
+function getLoginThemeForPhilippineTime() {
+  const hour = getPhilippineHour();
+  return hour >= 18 || hour < 6 ? 'dark' : 'light';
+}
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -11,7 +27,9 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const previousThemeRef = useRef(theme);
 
   const roleRoutes = {
     admin: '/admin',
@@ -29,11 +47,25 @@ export default function Login() {
       const user = await login(email, password);
       navigate(roleRoutes[user.role] || '/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      setError(err.response?.data?.message || err.userMessage || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const applyPhilippineTimeTheme = () => {
+      setTheme(getLoginThemeForPhilippineTime());
+    };
+
+    applyPhilippineTimeTheme();
+    const intervalId = window.setInterval(applyPhilippineTimeTheme, 60 * 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+      setTheme(previousThemeRef.current);
+    };
+  }, [setTheme]);
 
   return (
     <div className="login-page">
@@ -52,7 +84,7 @@ export default function Login() {
         <section className="login-panel" aria-labelledby="login-title">
           <div className="login-mark" aria-hidden="true" />
           <div className="login-header">
-            <h1 id="login-title">Sign in to COEDIGO</h1>
+            <h1 id="login-title">Log in to COEDIGO</h1>
             <p className="login-subtitle">College of Engineering Digital Interface for Grade Observations.</p>
           </div>
 
@@ -61,13 +93,13 @@ export default function Login() {
 
             <div className="input-group">
               <label htmlFor="login-email">Email address</label>
-              <input id="login-email" type="email" className="input-field" placeholder="you@jrmsu.edu.ph" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
+              <input id="login-email" type="email" className="input-field" placeholder="you@jrmsu.edu.ph" value={email} onChange={e => setEmail(e.target.value)} required autoFocus autoComplete="email" />
             </div>
 
             <div className="input-group">
               <label htmlFor="login-password">Password</label>
               <div className="password-wrapper">
-                <input id="login-password" type={showPw ? 'text' : 'password'} className="input-field" placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} required />
+                <input id="login-password" type={showPw ? 'text' : 'password'} className="input-field" placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" />
                 <button type="button" className="password-toggle" onClick={() => setShowPw(!showPw)} aria-label="Toggle password visibility">
                   {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -82,6 +114,7 @@ export default function Login() {
 
           <div className="login-footer">
             <p>Protected academic access for JRMSU College of Engineering.</p>
+            <Link to="/developers" className="login-footer-link">Developed by COEDIGO TEAM</Link>
           </div>
         </section>
       </main>

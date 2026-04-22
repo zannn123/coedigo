@@ -1,0 +1,393 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+4 0 obj
+<< /Type /Pages /Count 7 /Kids [5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R] >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 3434 >>
+stream
+BT /F2 20.0 Tf 1 0 0 1 50 792.0 Tm (COEDIGO Project Documentation) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 759.0 Tm (System: College of Engineering Digital Interface for Grading and Operations) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 739.5 Tm (Institution: Jose Rizal Memorial State University - College of Engineering) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 720.0 Tm (Repository: C:\\Users\\DjMhel\\Documents\\COEDIGO) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 700.5 Tm (Prepared: April 22, 2026) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 681.0 Tm (1. Project Summary) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 655.0 Tm (COEDIGO is a role-based academic records system for the College of Engineering. It) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 641.5 Tm (provides login, user management, class records, subject management, grade encoding,) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 628.0 Tm (attendance tracking, student grade viewing, audit logging, notifications, and) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 614.5 Tm (email-based account onboarding.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 595.0 Tm (The application is split into a React frontend and a PHP backend API with a MySQL) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 581.5 Tm (database. The frontend talks to the backend through the /api path.) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 562.0 Tm (2. Technology Stack) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 536.0 Tm (Layer | Technology | Notes) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 521.7 Tm (Frontend | React + Vite + TypeScript toolchain | Source is in frontend/. Build output is) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 509.4 Tm (frontend/dist/.) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 495.1 Tm (Frontend libraries | axios, react-router-dom, lucide-react, recharts | Installed through) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 482.8 Tm (frontend/package.json.) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 468.5 Tm (Backend | Plain PHP router and controllers | Main API entry point is backend/index.php.) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 454.2 Tm (Database | MySQL / MariaDB | Schema and seed data are in database/coedigo.sql.) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 439.9 Tm (Email delivery | Gmail SMTP / SMTP | Used for welcome emails when admins create) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 427.6 Tm (accounts.) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 413.3 Tm (Local development | Vite dev server + PHP built-in server | Frontend uses port 5173.) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 401.0 Tm (Backend uses port 8000.) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 386.7 Tm (3. Current Application Modules) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 360.7 Tm (Role | Main Routes | Purpose) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 346.4 Tm (Public | /login, /developers | Authentication and public developer page.) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 332.1 Tm (Admin | /admin, /admin/users, /admin/settings, /admin/audit-logs | User administration,) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 319.8 Tm (mail settings, system settings, and activity logs.) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 305.5 Tm (Faculty | /faculty, /faculty/classes, /faculty/subjects, /faculty/classes/:classId |) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 293.2 Tm (Class record management, subject handling, and grade encoding.) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 278.9 Tm (Student | /student, /student/subjects | Grade and attendance viewing, grouped by) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 266.6 Tm (academic year and subject.) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 252.3 Tm (Dean / Program Chair | /dean | Monitoring and reporting dashboard.) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 238.0 Tm (4. Repository Structure) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 3459 >>
+stream
+BT /F3 9.0 Tf 1 0 0 1 50 792.0 Tm (COEDIGO/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 780.0 Tm (|-- backend/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 768.0 Tm (|   |-- config/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 756.0 Tm (|   |-- controllers/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 744.0 Tm (|   |-- logs/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 732.0 Tm (|   |-- middleware/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 720.0 Tm (|   |-- utils/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 708.0 Tm (|   |-- .htaccess) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 696.0 Tm (|   `-- index.php) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 684.0 Tm (|-- database/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 672.0 Tm (|   `-- coedigo.sql) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 660.0 Tm (|-- frontend/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 648.0 Tm (|   |-- public/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 636.0 Tm (|   |-- src/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 624.0 Tm (|   |-- .env.example) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 612.0 Tm (|   |-- package.json) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 600.0 Tm (|   `-- vite.config.js) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 588.0 Tm (|-- scripts/) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 576.0 Tm (|   `-- start-backend.ps1) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 564.0 Tm (`-- COEDIGO_Documentation.html / COEDIGO_Documentation.pdf) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 544.0 Tm (5. System Requirements) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 518.0 Tm (5.1 Development Requirements) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 497.0 Tm (- - Node.js 18 or newer) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 481.5 Tm (- - npm) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 466.0 Tm (- - PHP 8.0 or newer) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 450.5 Tm (- - MySQL 8.x or MariaDB equivalent) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 435.0 Tm (- - Windows PowerShell for the provided backend start script) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 419.5 Tm (5.2 Required PHP Capabilities) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 398.5 Tm (- - pdo_mysql for database access) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 383.0 Tm (- - json support) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 367.5 Tm (- - mbstring recommended) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 352.0 Tm (- - curl recommended for SMTP delivery) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 336.5 Tm (- - openssl for secure TLS/SSL SMTP connections) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 321.0 Tm (5.3 Default Database Configuration in Code) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 300.0 Tm (The backend uses these defaults when environment variables are not set:) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 280.5 Tm (Variable | Default) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 266.2 Tm (DB_HOST | localhost) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 251.9 Tm (DB_NAME | coedigo_db) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 237.6 Tm (DB_USER | root) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 223.3 Tm (DB_PASS | empty string) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 209.0 Tm (6. Database Setup) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 183.0 Tm (1. 1. Create a MySQL database server instance if one is not already available.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 167.5 Tm (2. 2. Import database/coedigo.sql into MySQL or MariaDB.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 152.0 Tm (3. 3. Confirm that the database name is coedigo_db, or set environment variables to) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 138.5 Tm (   match your actual database name.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 123.0 Tm (  -   - Verify that the following tables exist after import:) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 107.5 Tm (  -   - users) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 92.0 Tm (  -   - subjects) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 76.5 Tm (  -   - class_records) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 10 0 R >>
+endobj
+10 0 obj
+<< /Length 3240 >>
+stream
+BT /F1 10.5 Tf 1 0 0 1 50 792.0 Tm (  -   - enrollments) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 776.5 Tm (  -   - attendance_records) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 761.0 Tm (  -   - grade_components) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 745.5 Tm (  -   - grades) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 730.0 Tm (  -   - notifications) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 714.5 Tm (  -   - audit_logs) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 699.0 Tm (  -   - system_settings) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 683.5 Tm (6.1 Default Seeded Admin Account) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 662.5 Tm (Field | Value) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 648.2 Tm (Email | admin@jrmsu.edu.ph) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 633.9 Tm (Password | admin123) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 619.6 Tm (Role | admin) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 605.3 Tm (7. Local Development Startup Guide) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 579.3 Tm (7.1 Install Frontend Dependencies) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 558.3 Tm (cd C:\\Users\\DjMhel\\Documents\\COEDIGO\\frontend) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 546.3 Tm (npm install) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 526.3 Tm (7.2 Start the Full Local Stack) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 505.3 Tm (The fastest local startup is the combined frontend command:) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 485.8 Tm (cd C:\\Users\\DjMhel\\Documents\\COEDIGO\\frontend) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 473.8 Tm (npm run dev:fullstack) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 453.8 Tm (This does two things:) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 434.3 Tm (- - Starts the PHP backend on http://127.0.0.1:8000) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 418.8 Tm (- - Starts the Vite frontend on http://127.0.0.1:5173) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 403.3 Tm (7.3 Start Backend Only) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 382.3 Tm (cd C:\\Users\\DjMhel\\Documents\\COEDIGO\\frontend) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 370.3 Tm (npm run dev:backend) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 350.3 Tm (7.4 Start Frontend Only) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 329.3 Tm (cd C:\\Users\\DjMhel\\Documents\\COEDIGO\\frontend) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 317.3 Tm (npm run dev) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 297.3 Tm (7.5 Backend Startup Logic) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 276.3 Tm (The script scripts/start-backend.ps1 searches for php.exe in PATH and common XAMPP) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 262.8 Tm (locations, then starts the PHP built-in server with backend/index.php as the router on) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 249.3 Tm (port 8000.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 229.8 Tm (7.6 Local URLs) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 208.8 Tm (Service | URL) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 194.5 Tm (Frontend | http://127.0.0.1:5173) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 180.2 Tm (Backend API | http://127.0.0.1:8000/api) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 165.9 Tm (Login page | http://127.0.0.1:5173/login) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 151.6 Tm (8. Frontend API Configuration) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 125.6 Tm (The frontend supports two API connection modes.) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 106.1 Tm (Variable | Purpose | Example) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 91.8 Tm (VITE_API_PROXY_TARGET | Vite dev proxy target for local development |) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 79.5 Tm (http://127.0.0.1:8000) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 12 0 R >>
+endobj
+12 0 obj
+<< /Length 3822 >>
+stream
+BT /F3 9.3 Tf 1 0 0 1 50 792.0 Tm (VITE_API_BASE_URL | Direct API base URL, usually used in production or special local) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 779.7 Tm (setups | https://your-domain/api) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 765.4 Tm (Reference file:) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 745.9 Tm (frontend/.env.example) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 725.9 Tm (9. Authentication and User Behavior) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 699.9 Tm (- - Login is handled by POST /api/auth/login.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 684.4 Tm (- - The backend checks email, password hash, and account active status.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 668.9 Tm (- - Inactive accounts are not permanently removed by default. They are soft-deactivated) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 655.4 Tm (  through is_active = 0.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 639.9 Tm (- - Disabled users receive this login message: Account disabled. Please contact your) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 626.4 Tm (  program chair or the College of Engineering faculty office.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 610.9 Tm (- - Successful login returns a token and a role-specific user profile.) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 595.4 Tm (10. Email Delivery After Account Creation) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 569.4 Tm (When an admin creates a user, the system can send a welcome email using Gmail SMTP or) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 555.9 Tm (another SMTP server. If the admin leaves the password blank during account creation,) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 542.4 Tm (the system generates a random temporary password.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 522.9 Tm (10.1 Required Settings) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 501.9 Tm (Setting | Description) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 487.6 Tm (smtp_host | SMTP host, typically smtp.gmail.com) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 473.3 Tm (smtp_port | SMTP port, usually 465 for SSL or 587 for TLS) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 459.0 Tm (smtp_username | Full Gmail address or SMTP username) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 444.7 Tm (smtp_password | Gmail app password or SMTP password) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 430.4 Tm (smtp_encryption | ssl, tls, or none) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 416.1 Tm (mail_from_address | Sender email address, usually the same as the Gmail address) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 401.8 Tm (mail_from_name | Display name for outgoing emails) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 387.5 Tm (mail_reply_to | Optional reply-to address) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 373.2 Tm (10.2 Where to Configure Mail) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 352.2 Tm (- - Admin panel: System Settings) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 336.7 Tm (  -   - Environment fallback values:) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 321.2 Tm (  -   - SMTP_HOST) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 305.7 Tm (  -   - SMTP_PORT) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 290.2 Tm (  -   - SMTP_USERNAME) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 274.7 Tm (  -   - SMTP_PASSWORD) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 259.2 Tm (  -   - SMTP_ENCRYPTION) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 243.7 Tm (  -   - MAIL_FROM_ADDRESS) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 228.2 Tm (  -   - MAIL_FROM_NAME) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 212.7 Tm (  -   - MAIL_REPLY_TO) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 197.2 Tm (10.3 Mail Delivery Notes) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 176.2 Tm (- - The backend uses cURL for SMTP if available.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 160.7 Tm (- - If cURL is missing, it falls back to raw SMTP sockets.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 145.2 Tm (- - The server must be able to reach your SMTP host, such as smtp.gmail.com.) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 129.7 Tm (11. Logging and Diagnostics) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 103.7 Tm (11.1 Backend Application Logs) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 82.7 Tm (Application events are written to:) Tj ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 14 0 R >>
+endobj
+14 0 obj
+<< /Length 3847 >>
+stream
+BT /F3 9.0 Tf 1 0 0 1 50 792.0 Tm (backend/logs/app-YYYY-MM-DD.log) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 772.0 Tm (11.2 PHP Built-in Server Logs) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 751.0 Tm (When using the local start script, PHP server output is written to:) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 731.5 Tm (backend/logs/php-server.out.log) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 719.5 Tm (backend/logs/php-server.err.log) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 699.5 Tm (11.3 Examples of Important Log Events) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 678.5 Tm (- - database.connection.failed) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 663.0 Tm (- - user.create.success) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 647.5 Tm (- - user.create.failed) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 632.0 Tm (- - user.create.email_failed) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 616.5 Tm (- - mail.welcome.sent) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 601.0 Tm (- - mail.welcome.failed) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 585.5 Tm (- - mail.smtp.response_error) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 570.0 Tm (12. Common Troubleshooting) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 544.0 Tm (12.1 Login Fails Even When the User Exists) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 523.0 Tm (1. 1. Confirm that the frontend can reach the backend.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 507.5 Tm (2. 2. Check that the backend is running on 127.0.0.1:8000.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 492.0 Tm (3. 3. Check that the frontend Vite server is running on 127.0.0.1:5173.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 476.5 Tm (4. 4. Verify the database credentials in the backend environment.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 461.0 Tm (5. 5. Verify that the account is active by checking users.is_active = 1.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 445.5 Tm (6. 6. Verify that the password in the database is a valid PHP password hash.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 430.0 Tm (12.2 Account Creation Succeeds in UI But Row Is Missing) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 409.0 Tm (1. 1. Check whether the frontend is talking to the same backend instance you are) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 395.5 Tm (   inspecting.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 380.0 Tm (2. 2. Confirm that the backend is connected to the same database you are viewing in) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 366.5 Tm (   phpMyAdmin.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 351.0 Tm (3. 3. Review backend/logs/app-YYYY-MM-DD.log for user creation errors.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 335.5 Tm (12.3 Email Not Sent) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 314.5 Tm (1. 1. Verify SMTP settings in Admin > System Settings.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 299.0 Tm (2. 2. Verify that the Gmail account has 2-Step Verification and a valid app password.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 283.5 Tm (3. 3. Check backend logs for mail.welcome.failed or mail.smtp.response_error.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 268.0 Tm (4. 4. Verify outbound SMTP access to smtp.gmail.com on port 465 or 587.) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 252.5 Tm (13. Production Deployment Guide) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 226.5 Tm (The cleanest production deployment is to host the frontend and backend under the same) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 213.0 Tm (domain, with the backend exposed under the /api path.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 193.5 Tm (13.1 Recommended Production Architecture) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 172.5 Tm (- - Frontend: static files from frontend/dist/) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 157.0 Tm (- - Backend: PHP application in backend/) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 141.5 Tm (- - Database: MySQL or MariaDB on the same server or a managed DB server) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 126.0 Tm (- - HTTPS: required) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 110.5 Tm (13.2 Recommended Production Environment Variables) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 89.5 Tm (Variable | Purpose) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 75.2 Tm (DB_HOST | Database host) Tj ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 16 0 R >>
+endobj
+16 0 obj
+<< /Length 3967 >>
+stream
+BT /F3 9.3 Tf 1 0 0 1 50 792.0 Tm (DB_NAME | Database name) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 777.7 Tm (DB_USER | Database user) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 763.4 Tm (DB_PASS | Database password) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 749.1 Tm (SMTP_HOST | SMTP host) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 734.8 Tm (SMTP_PORT | SMTP port) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 720.5 Tm (SMTP_USERNAME | SMTP username or Gmail address) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 706.2 Tm (SMTP_PASSWORD | SMTP password or Gmail app password) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 691.9 Tm (SMTP_ENCRYPTION | SMTP encryption mode) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 677.6 Tm (MAIL_FROM_ADDRESS | Sender email) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 663.3 Tm (MAIL_FROM_NAME | Sender display name) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 649.0 Tm (MAIL_REPLY_TO | Optional reply-to address) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 634.7 Tm (13.3 Build the Frontend for Production) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 613.7 Tm (cd C:\\Users\\DjMhel\\Documents\\COEDIGO\\frontend) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 601.7 Tm (npm install) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 589.7 Tm (npm run build) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 569.7 Tm (Deploy the contents of frontend/dist/ to your web server.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 550.2 Tm (13.4 Frontend Production API URL) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 529.2 Tm (If frontend and backend are served from different origins, build the frontend with) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 515.7 Tm (VITE_API_BASE_URL set to the real backend endpoint, for example:) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 496.2 Tm (VITE_API_BASE_URL=https://coedigo.example.edu/api) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 476.2 Tm (13.5 Apache Deployment Notes) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 455.2 Tm (- - Point the frontend site root to the built frontend files.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 439.7 Tm (- - Expose the PHP backend under /api.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 424.2 Tm (- - Keep backend/.htaccess active so non-file API routes are rewritten to) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 410.7 Tm (  backend/index.php.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 395.2 Tm (- - Enable Apache rewrite support.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 379.7 Tm (13.6 Example Apache Layout) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 358.7 Tm (DocumentRoot /var/www/coedigo/frontend/dist) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 346.7 Tm () Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 334.7 Tm (/var/www/coedigo/frontend/dist         -> static frontend build) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 322.7 Tm (/var/www/coedigo/backend               -> PHP API application) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 310.7 Tm (https://your-domain/                  -> frontend) Tj ET
+BT /F3 9.0 Tf 1 0 0 1 50 298.7 Tm (https://your-domain/api/...           -> backend/index.php router) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 278.7 Tm (13.7 Nginx Deployment Notes) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 257.7 Tm (Nginx is also valid, but you must replicate the rewrite behavior currently provided by) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 244.2 Tm (backend/.htaccess. All API requests that are not actual files should be passed to) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 230.7 Tm (backend/index.php.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 211.2 Tm (13.8 File and Folder Permissions) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 190.2 Tm (- - The web server must be able to read all backend and frontend files.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 174.7 Tm (- - The backend process must be able to write to backend/logs/.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 159.2 Tm (- - Do not expose internal backend logs publicly over HTTP.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 143.7 Tm (13.9 SSL and Security Baseline) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 122.7 Tm (- - Use HTTPS only in production.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 107.2 Tm (- - Replace the hard-coded JWT secret in backend/middleware/AuthMiddleware.php with a) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 93.7 Tm (  production-managed secret.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 78.2 Tm (- - Change the default admin password.) Tj ET
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 18 0 R >>
+endobj
+18 0 obj
+<< /Length 3253 >>
+stream
+BT /F1 10.5 Tf 1 0 0 1 50 792.0 Tm (- - Use a database user with only the required permissions.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 776.5 Tm (- - Restrict public access to phpMyAdmin or remove it from production.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 50 761.0 Tm (13.10 Backup Strategy) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 740.0 Tm (- - Back up the MySQL database daily.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 724.5 Tm (- - Back up the backend/logs/ directory if audit trace retention is required.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 709.0 Tm (- - Back up any uploaded assets if file uploads are added later.) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 693.5 Tm (14. Release Procedure for Future Updates) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 667.5 Tm (1. 1. Pull the latest repository changes into a staging environment.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 652.0 Tm (2. 2. Run database updates if the schema changed.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 636.5 Tm (3. 3. Install frontend dependencies and rebuild the frontend.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 621.0 Tm (4. 4. Deploy frontend/dist/ and backend PHP files.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 605.5 Tm (5. 5. Verify login, user creation, grade views, and email delivery in staging.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 590.0 Tm (6. 6. Deploy to production during a controlled maintenance window if needed.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 574.5 Tm (7. 7. Monitor error logs immediately after release.) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 559.0 Tm (15. Suggested Future Improvements) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 533.0 Tm (- - Move the JWT secret out of source code into an environment variable.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 517.5 Tm (- - Add database migrations instead of relying only on the full SQL schema file.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 502.0 Tm (- - Add automated tests for authentication, account creation, and grading flows.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 486.5 Tm (- - Add a production health check endpoint.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 471.0 Tm (- - Add a test-email button in System Settings to validate Gmail SMTP before onboarding) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 457.5 Tm (  users.) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 442.0 Tm (16. Operational Checklist) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 416.0 Tm (Check | Status to Confirm) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 401.7 Tm (Database imported | coedigo_db exists and tables are present) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 387.4 Tm (Backend reachable | /api/auth/login responds) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 373.1 Tm (Frontend reachable | Login page loads) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 358.8 Tm (Admin login works | Seeded admin or production admin can sign in) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 344.5 Tm (Logs writable | backend/logs receives entries) Tj ET
+BT /F3 9.3 Tf 1 0 0 1 50 330.2 Tm (Email settings configured | SMTP settings saved and Gmail app password verified) Tj ET
+BT /F2 15.0 Tf 1 0 0 1 50 315.9 Tm (17. Document Maintenance) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 289.9 Tm (This documentation was generated from the current repository state on April 22, 2026.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 276.4 Tm (Update this document whenever startup commands, deployment topology, database schema,) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 50 262.9 Tm (or environment variables change.) Tj ET
+endstream
+endobj
+19 0 obj
+<< /Type /Catalog /Pages 4 0 R >>
+endobj
+xref
+0 20
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000000228 00000 n 
+0000000325 00000 n 
+0000000471 00000 n 
+0000003957 00000 n 
+0000004103 00000 n 
+0000007614 00000 n 
+0000007761 00000 n 
+0000011054 00000 n 
+0000011202 00000 n 
+0000015077 00000 n 
+0000015225 00000 n 
+0000019125 00000 n 
+0000019273 00000 n 
+0000023293 00000 n 
+0000023441 00000 n 
+0000026747 00000 n 
+trailer
+<< /Size 20 /Root 19 0 R >>
+startxref
+26797
+%%EOF

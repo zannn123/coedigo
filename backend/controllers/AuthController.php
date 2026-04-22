@@ -16,6 +16,7 @@ class AuthController {
     public function __construct() {
         $database = new Database();
         $this->db = $database->getConnection();
+        $this->ensureAccountUpdateRequestTable();
     }
 
     /**
@@ -23,23 +24,30 @@ class AuthController {
      */
     public function login() {
         $data = json_decode(file_get_contents('php://input'), true);
+        $email = strtolower(trim((string)($data['email'] ?? '')));
+        $password = (string)($data['password'] ?? '');
 
         $validator = new Validator();
-        $validator->required('email', $data['email'] ?? '')
-                  ->required('password', $data['password'] ?? '')
-                  ->email('email', $data['email'] ?? '');
+        $validator->required('email', $email)
+                  ->required('password', $password)
+                  ->email('email', $email);
 
         if (!$validator->isValid()) {
             Response::error('Validation failed.', 422, $validator->getErrors());
         }
 
-        $stmt = $this->db->prepare("SELECT * FROM users WHERE email = ? AND is_active = 1");
-        $stmt->execute([$data['email']]);
+        $stmt = $this->db->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->execute([$email]);
         $user = $stmt->fetch();
 
-        if (!$user || !password_verify($data['password'], $user['password_hash'])) {
+        if ($user && (int)$user['is_active'] !== 1) {
+            $this->logAudit($user['id'], 'LOGIN_DISABLED_ACCOUNT', 'user', $user['id'], null, ['email' => $email]);
+            Response::error('Account disabled. Please contact your program chair or the College of Engineering faculty office.', 403);
+        }
+
+        if (!$user || !password_verify($password, $user['password_hash'])) {
             // Log failed attempt
-            $this->logAudit(null, 'LOGIN_FAILED', 'user', null, null, ['email' => $data['email']]);
+            $this->logAudit(null, 'LOGIN_FAILED', 'user', null, null, ['email' => $email]);
             Response::error('Invalid email or password.', 401);
         }
 
@@ -119,6 +127,192 @@ class AuthController {
         $this->logAudit($auth['sub'], 'PASSWORD_CHANGED', 'user', $auth['sub']);
 
         Response::success(null, 'Password changed successfully.');
+    }
+
+    /**
+     * POST /api/auth/credential-request
+     */
+    public function requestCredentialUpdate() {
+        $auth = AuthMiddleware::authenticate();
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        if (!is_array($data)) {
+            Response::error('Invalid request payload.', 400);
+        }
+
+        $requestType = trim((string)($data['request_type'] ?? 'profile_update'));
+        $requestedEmail = trim((string)($data['requested_email'] ?? ''));
+        $requestedContact = trim((string)($data['requested_contact_number'] ?? ''));
+        $note = trim((string)($data['note'] ?? ''));
+
+        $validator = new Validator();
+        $validator->required('note', $note)
+                  ->minLength('note', $note, 10, 'Note');
+
+        if ($requestedEmail !== '') {
+            $validator->email('requested_email', $requestedEmail, 'Requested email');
+        }
+
+        if (!$validator->isValid()) {
+            Response::error('Validation failed.', 422, $validator->getErrors());
+        }
+
+        $userStmt = $this->db->prepare("
+            SELECT id, first_name, middle_name, last_name, suffix, email, role, student_id, employee_id, contact_number
+            FROM users
+            WHERE id = ?
+        ");
+        $userStmt->execute([$auth['sub']]);
+        $user = $userStmt->fetch();
+
+        if (!$user) {
+            Response::error('User not found.', 404);
+        }
+
+        $adminStmt = $this->db->query("SELECT id FROM users WHERE role = 'admin' AND is_active = 1");
+        $adminIds = array_map('intval', array_column($adminStmt->fetchAll(), 'id'));
+
+        if (!$adminIds) {
+            Response::error('No active administrator is available to receive this request.', 503);
+        }
+
+        $fullName = trim(implode(' ', array_filter([
+            $user['first_name'] ?? '',
+            $user['middle_name'] ?? '',
+            $user['last_name'] ?? '',
+            $user['suffix'] ?? '',
+        ])));
+
+        $summary = $this->buildCredentialRequestSummary($user, $requestType, $requestedEmail, $requestedContact, $note);
+
+        $this->db->beginTransaction();
+        try {
+            $requestInsert = $this->db->prepare("
+                INSERT INTO account_update_requests (
+                    requester_user_id,
+                    request_type,
+                    current_email,
+                    current_contact_number,
+                    requested_email,
+                    requested_contact_number,
+                    note
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            $requestInsert->execute([
+                (int)$user['id'],
+                $requestType,
+                $user['email'] ?: null,
+                $user['contact_number'] ?: null,
+                $requestedEmail !== '' ? $requestedEmail : null,
+                $requestedContact !== '' ? $requestedContact : null,
+                $note,
+            ]);
+
+            $requestId = (int)$this->db->lastInsertId();
+
+            $insert = $this->db->prepare("
+                INSERT INTO notifications (user_id, title, message, type, reference_type, reference_id)
+                VALUES (?, ?, ?, 'system', 'account_update_request', ?)
+            ");
+
+            foreach ($adminIds as $adminId) {
+                $insert->execute([
+                    $adminId,
+                    'Account update request',
+                    $summary,
+                    $requestId,
+                ]);
+            }
+
+            $this->db->commit();
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            Response::error('Unable to create the request right now.', 500);
+        }
+
+        $this->logAudit(
+            $auth['sub'],
+            'CREDENTIAL_UPDATE_REQUESTED',
+            'user',
+            $auth['sub'],
+            null,
+            [
+                'request_type' => $requestType,
+                'requested_email' => $requestedEmail ?: null,
+                'requested_contact_number' => $requestedContact ?: null,
+                'note' => $note,
+                'sent_to_admin_ids' => $adminIds,
+            ]
+        );
+
+        Response::success(null, 'Your request has been sent to the admin.');
+    }
+
+    private function formatCredentialRequestType($requestType) {
+        $labels = [
+            'profile_update' => 'Profile update',
+            'email_change' => 'Email change',
+            'contact_change' => 'Contact number change',
+            'student_record' => 'Student record correction',
+            'employee_record' => 'Employee record correction',
+            'other' => 'Other',
+        ];
+
+        return $labels[$requestType] ?? ucwords(str_replace('_', ' ', $requestType));
+    }
+
+    private function buildCredentialRequestSummary(array $user, $requestType, $requestedEmail, $requestedContact, $note) {
+        $changeLines = [];
+        $changeLines[] = 'Requester: ' . trim(implode(' ', array_filter([
+            $user['first_name'] ?? '',
+            $user['middle_name'] ?? '',
+            $user['last_name'] ?? '',
+            $user['suffix'] ?? '',
+        ])));
+        $changeLines[] = 'Request type: ' . $this->formatCredentialRequestType($requestType);
+        $changeLines[] = 'Current email: ' . ($user['email'] ?: 'N/A');
+        if ($requestedEmail !== '') {
+            $changeLines[] = 'Requested email: ' . $requestedEmail;
+        }
+        if ($requestedContact !== '') {
+            $changeLines[] = 'Requested contact number: ' . $requestedContact;
+        }
+        if (!empty($user['student_id'])) {
+            $changeLines[] = 'Student ID: ' . $user['student_id'];
+        }
+        if (!empty($user['employee_id'])) {
+            $changeLines[] = 'Employee ID: ' . $user['employee_id'];
+        }
+        $changeLines[] = 'Note: ' . $note;
+
+        return implode("\n", $changeLines);
+    }
+
+    private function ensureAccountUpdateRequestTable() {
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS account_update_requests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                requester_user_id INT NOT NULL,
+                request_type VARCHAR(50) NOT NULL,
+                current_email VARCHAR(255) DEFAULT NULL,
+                current_contact_number VARCHAR(20) DEFAULT NULL,
+                requested_email VARCHAR(255) DEFAULT NULL,
+                requested_contact_number VARCHAR(20) DEFAULT NULL,
+                note TEXT NOT NULL,
+                status ENUM('pending', 'done', 'cancelled') NOT NULL DEFAULT 'pending',
+                admin_note TEXT DEFAULT NULL,
+                resolved_by INT DEFAULT NULL,
+                resolved_at DATETIME DEFAULT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (requester_user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL,
+                INDEX idx_requester_status (requester_user_id, status),
+                INDEX idx_created (created_at)
+            ) ENGINE=InnoDB
+        ");
     }
 
     private function logAudit($userId, $action, $entityType = null, $entityId = null, $oldValues = null, $newValues = null) {

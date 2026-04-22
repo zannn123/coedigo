@@ -92,18 +92,36 @@ class ClassController {
         $data = json_decode(file_get_contents('php://input'), true);
 
         // Verify ownership
-        $stmt = $this->db->prepare("SELECT * FROM class_records WHERE id = ? AND faculty_id = ?");
+        $stmt = $this->db->prepare("
+            SELECT cr.*, s.name AS subject_name
+            FROM class_records cr
+            INNER JOIN subjects s ON cr.subject_id = s.id
+            WHERE cr.id = ? AND cr.faculty_id = ?
+        ");
         $stmt->execute([$id, $auth['sub']]);
-        if (!$stmt->fetch()) Response::error('Class record not found or unauthorized.', 404);
+        $classRecord = $stmt->fetch();
+        if (!$classRecord) Response::error('Class record not found or unauthorized.', 404);
 
         $studentIds = $data['student_ids'] ?? [];
         if (empty($studentIds)) Response::error('No students provided.', 400);
 
         $enrolled = 0;
         $stmt = $this->db->prepare("INSERT IGNORE INTO enrollments (class_record_id, student_id) VALUES (?, ?)");
+        $notification = $this->db->prepare("
+            INSERT INTO notifications (user_id, title, message, type, reference_type, reference_id)
+            VALUES (?, ?, ?, 'system', 'class_record', ?)
+        ");
         foreach ($studentIds as $sid) {
             $stmt->execute([$id, $sid]);
-            $enrolled += $stmt->rowCount();
+            if ($stmt->rowCount() > 0) {
+                $enrolled++;
+                $notification->execute([
+                    $sid,
+                    'New Subject Added',
+                    "You were added to {$classRecord['subject_name']} ({$classRecord['section']}) for {$classRecord['semester']} {$classRecord['academic_year']}.",
+                    $id,
+                ]);
+            }
         }
         Response::success(['enrolled' => $enrolled], "$enrolled student(s) enrolled.");
     }
@@ -127,27 +145,51 @@ class ClassController {
             Response::error('Invalid grade status.', 400);
         }
 
-        $stmt = $this->db->prepare("SELECT * FROM class_records WHERE id = ? AND faculty_id = ?");
+        $stmt = $this->db->prepare("
+            SELECT cr.*, s.name AS subject_name
+            FROM class_records cr
+            INNER JOIN subjects s ON cr.subject_id = s.id
+            WHERE cr.id = ? AND cr.faculty_id = ?
+        ");
         $stmt->execute([$id, $auth['sub']]);
-        if (!$stmt->fetch()) Response::error('Unauthorized.', 403);
+        $classRecord = $stmt->fetch();
+        if (!$classRecord) Response::error('Unauthorized.', 403);
 
-        $extra = '';
-        $params = [$status];
-        if ($status === 'faculty_verified') { $extra = ', verified_at = NOW()'; }
-        if ($status === 'officially_released') { $extra = ', released_at = NOW()'; }
-        $params[] = $id;
+        $verifiedAtSql = "verified_at = NULL";
+        $releasedAtSql = "released_at = NULL";
 
-        $this->db->prepare("UPDATE class_records SET grade_status = ?$extra WHERE id = ?")->execute($params);
+        if ($status === 'faculty_verified') {
+            $verifiedAtSql = "verified_at = NOW()";
+        } elseif ($status === 'officially_released') {
+            $verifiedAtSql = $classRecord['verified_at'] ? "verified_at = verified_at" : "verified_at = NOW()";
+            $releasedAtSql = "released_at = NOW()";
+        }
 
-        // Notify students if released
-        if ($status === 'officially_released') {
-            $students = $this->db->prepare("SELECT e.student_id, s.name as subject_name FROM enrollments e INNER JOIN class_records cr ON e.class_record_id = cr.id INNER JOIN subjects s ON cr.subject_id = s.id WHERE e.class_record_id = ? AND e.is_active = 1");
+        $this->db->prepare("
+            UPDATE class_records
+            SET grade_status = ?, $verifiedAtSql, $releasedAtSql
+            WHERE id = ?
+        ")->execute([$status, $id]);
+
+        if ($status === 'faculty_verified' || $status === 'officially_released') {
+            $students = $this->db->prepare("SELECT student_id FROM enrollments WHERE class_record_id = ? AND is_active = 1");
             $students->execute([$id]);
-            $notif = $this->db->prepare("INSERT INTO notifications (user_id, title, message, type, reference_type, reference_id) VALUES (?, ?, ?, 'grade_released', 'class_record', ?)");
+
+            $title = $status === 'faculty_verified' ? 'Grades Verified' : 'Grades Released';
+            $message = $status === 'faculty_verified'
+                ? "Your live scores for {$classRecord['subject_name']} ({$classRecord['section']}) are now faculty-verified. The current final mark is visible in your portal."
+                : "Your grades for {$classRecord['subject_name']} ({$classRecord['section']}) have been officially released.";
+            $type = $status === 'faculty_verified' ? 'grade_updated' : 'grade_released';
+
+            $notif = $this->db->prepare("
+                INSERT INTO notifications (user_id, title, message, type, reference_type, reference_id)
+                VALUES (?, ?, ?, ?, 'class_record', ?)
+            ");
             while ($row = $students->fetch()) {
-                $notif->execute([$row['student_id'], 'Grades Released', "Your grades for {$row['subject_name']} have been officially released.", $id]);
+                $notif->execute([$row['student_id'], $title, $message, $type, $id]);
             }
         }
+
         Response::success(null, 'Grade status updated.');
     }
 }

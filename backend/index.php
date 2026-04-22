@@ -52,6 +52,10 @@ elseif ($path === '/api/auth/password' && $method === 'PUT') {
     require_once __DIR__ . '/controllers/AuthController.php';
     (new AuthController())->changePassword();
 }
+elseif ($path === '/api/auth/credential-request' && $method === 'POST') {
+    require_once __DIR__ . '/controllers/AuthController.php';
+    (new AuthController())->requestCredentialUpdate();
+}
 
 // --- USER ROUTES ---
 elseif ($path === '/api/users' && $method === 'GET') {
@@ -65,6 +69,10 @@ elseif ($path === '/api/users/stats' && $method === 'GET') {
 elseif ($path === '/api/users' && $method === 'POST') {
     require_once __DIR__ . '/controllers/UserController.php';
     (new UserController())->create();
+}
+elseif (preg_match('#^/api/users/(\d+)/status$#', $path, $m) && $method === 'PUT') {
+    require_once __DIR__ . '/controllers/UserController.php';
+    (new UserController())->updateStatus($m[1]);
 }
 elseif (preg_match('#^/api/users/(\d+)$#', $path, $m) && $method === 'GET') {
     require_once __DIR__ . '/controllers/UserController.php';
@@ -136,6 +144,10 @@ elseif ($path === '/api/grades/encode' && $method === 'POST') {
     require_once __DIR__ . '/controllers/GradeController.php';
     (new GradeController())->encodeScores();
 }
+elseif ($path === '/api/grades/attendance' && $method === 'POST') {
+    require_once __DIR__ . '/controllers/GradeController.php';
+    (new GradeController())->saveAttendance();
+}
 elseif (preg_match('#^/api/grades/compute/(\d+)$#', $path, $m) && $method === 'POST') {
     require_once __DIR__ . '/controllers/GradeController.php';
     (new GradeController())->computeGrade($m[1]);
@@ -154,6 +166,10 @@ elseif (preg_match('#^/api/grades/component/(\d+)$#', $path, $m) && $method === 
 }
 
 // --- REPORT ROUTES ---
+elseif (preg_match('#^/api/reports/class/(\d+)/xlsx$#', $path, $m) && $method === 'GET') {
+    require_once __DIR__ . '/controllers/ReportController.php';
+    (new ReportController())->classRecordXlsx($m[1]);
+}
 elseif (preg_match('#^/api/reports/class/(\d+)$#', $path, $m) && $method === 'GET') {
     require_once __DIR__ . '/controllers/ReportController.php';
     (new ReportController())->classReport($m[1]);
@@ -161,6 +177,10 @@ elseif (preg_match('#^/api/reports/class/(\d+)$#', $path, $m) && $method === 'GE
 elseif ($path === '/api/reports/dashboard' && $method === 'GET') {
     require_once __DIR__ . '/controllers/ReportController.php';
     (new ReportController())->monitoringDashboard();
+}
+elseif ($path === '/api/reports/students' && $method === 'GET') {
+    require_once __DIR__ . '/controllers/ReportController.php';
+    (new ReportController())->studentRoster();
 }
 elseif (preg_match('#^/api/reports/student/(\d+)$#', $path, $m) && $method === 'GET') {
     require_once __DIR__ . '/controllers/ReportController.php';
@@ -179,6 +199,10 @@ elseif ($path === '/api/notifications/unread-count' && $method === 'GET') {
 elseif (preg_match('#^/api/notifications/(\d+)/read$#', $path, $m) && $method === 'PUT') {
     require_once __DIR__ . '/controllers/NotificationController.php';
     (new NotificationController())->markRead($m[1]);
+}
+elseif (preg_match('#^/api/notifications/(\d+)/request-status$#', $path, $m) && $method === 'PUT') {
+    require_once __DIR__ . '/controllers/NotificationController.php';
+    (new NotificationController())->updateRequestStatus($m[1]);
 }
 elseif ($path === '/api/notifications/read-all' && $method === 'PUT') {
     require_once __DIR__ . '/controllers/NotificationController.php';
@@ -209,7 +233,13 @@ elseif ($path === '/api/settings' && $method === 'PUT') {
     $data = json_decode(file_get_contents('php://input'), true);
     $db = (new Database())->getConnection();
     foreach ($data as $key => $value) {
-        $db->prepare("UPDATE system_settings SET setting_value = ?, updated_by = ? WHERE setting_key = ?")->execute([$value, $auth['sub'], $key]);
+        $db->prepare("
+            INSERT INTO system_settings (setting_key, setting_value, updated_by)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                setting_value = VALUES(setting_value),
+                updated_by = VALUES(updated_by)
+        ")->execute([$key, $value, $auth['sub']]);
     }
     Response::success(null, 'Settings updated.');
 }

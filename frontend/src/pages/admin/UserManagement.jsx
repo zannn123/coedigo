@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
-import { UserPlus, Search, Edit, Trash2, X } from 'lucide-react';
+import { UserPlus, Search, Edit, Lock, Unlock, X } from 'lucide-react';
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -22,11 +22,26 @@ export default function UserManagement() {
 
   useEffect(() => { fetchUsers(); }, [page, roleFilter]);
 
-  const showToast = (msg, type='success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
+  const showToast = (msg, type='success', duration=3000) => { setToast({ msg, type }); setTimeout(() => setToast(null), duration); };
 
   const openCreate = () => { setEditing(null); setForm({ first_name:'', last_name:'', middle_name:'', email:'', password:'', role:'student', department:'College of Engineering', program:'', year_level:'', student_id:'', employee_id:'', contact_number:'' }); setShowModal(true); };
 
   const openEdit = (u) => { setEditing(u); setForm({ ...u, password:'' }); setShowModal(true); };
+
+  const handleStatusToggle = async (user) => {
+    const targetActive = user.is_active == 1 ? 0 : 1;
+    const actionLabel = targetActive === 1 ? 'reactivate' : 'deactivate';
+    const confirmed = confirm(`Do you want to ${actionLabel} this account?`);
+    if (!confirmed) return;
+
+    try {
+      const response = await api.put(`/users/${user.id}/status`, { is_active: targetActive });
+      showToast(response.data?.message || (targetActive === 1 ? 'User reactivated.' : 'User deactivated.'));
+      fetchUsers();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Error', 'error');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,20 +49,31 @@ export default function UserManagement() {
       if (editing) {
         const payload = { ...form };
         if (!payload.password) delete payload.password;
-        await api.put(`/users/${editing.id}`, payload);
-        showToast('User updated successfully.');
+        const response = await api.put(`/users/${editing.id}`, payload);
+        showToast(response.data?.message || 'User updated successfully.');
       } else {
-        await api.post('/users', form);
-        showToast('User created successfully.');
+        const response = await api.post('/users', form);
+        const tempPassword = response.data?.data?.temporary_password;
+        const emailError = response.data?.data?.email_error;
+        const createdButEmailFailed = response.data?.data?.email_sent === false;
+
+        let message = response.data?.message || 'User created successfully.';
+        if (tempPassword) {
+          message += ` Temporary password: ${tempPassword}`;
+        }
+        if (emailError) {
+          message += ` ${emailError}`;
+        }
+
+        showToast(message, createdButEmailFailed ? 'error' : 'success', tempPassword || emailError ? 10000 : 3500);
       }
       setShowModal(false); fetchUsers();
-    } catch (err) { showToast(err.response?.data?.message || 'Error', 'error'); }
-  };
-
-  const handleDelete = async (id) => {
-    if (!confirm('Deactivate this user?')) return;
-    try { await api.delete(`/users/${id}`); showToast('User deactivated.'); fetchUsers(); }
-    catch (err) { showToast(err.response?.data?.message || 'Error', 'error'); }
+    } catch (err) {
+      const fieldErrors = err.response?.data?.errors;
+      const fieldErrorMessage = fieldErrors ? Object.values(fieldErrors).join(' ') : '';
+      const message = [err.response?.data?.message, fieldErrorMessage].filter(Boolean).join(' ') || 'Error';
+      showToast(message, 'error', 7000);
+    }
   };
 
   const totalPages = Math.ceil(total / 15);
@@ -75,6 +101,9 @@ export default function UserManagement() {
             <option value="program_chair">Program Chair</option>
           </select>
         </div>
+        <p style={{ marginTop: '0.875rem', color: 'var(--text-secondary)', fontSize: '0.8125rem' }}>
+          Accounts are not removed from the database. Deactivation only disables login access until the account is reactivated.
+        </p>
       </div>
 
       <div className="table-container">
@@ -92,7 +121,14 @@ export default function UserManagement() {
                 <td>
                   <div className="flex-gap">
                     <button className="btn btn-ghost btn-sm" onClick={() => openEdit(u)} title="Edit"><Edit size={15} /></button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(u.id)} title="Deactivate"><Trash2 size={15} /></button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => handleStatusToggle(u)}
+                      title={u.is_active == 1 ? 'Deactivate account' : 'Reactivate account'}
+                      style={{ color: u.is_active == 1 ? 'var(--danger)' : 'var(--success)' }}
+                    >
+                      {u.is_active == 1 ? <Lock size={15} /> : <Unlock size={15} />}
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -127,7 +163,15 @@ export default function UserManagement() {
                 <div className="input-group"><label htmlFor="um-role">Role *</label><select id="um-role" className="input-field" value={form.role} onChange={e => setForm({...form, role: e.target.value})} required><option value="student">Student</option><option value="faculty">Faculty</option><option value="admin">Admin</option><option value="dean">Dean</option><option value="program_chair">Program Chair</option></select></div>
               </div>
               <div className="input-group"><label htmlFor="um-email">Email *</label><input id="um-email" type="email" className="input-field" required value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
-              <div className="input-group"><label htmlFor="um-pw">{editing ? 'New Password (leave blank to keep)' : 'Password *'}</label><input id="um-pw" type="password" className="input-field" required={!editing} minLength={8} value={form.password} onChange={e => setForm({...form, password: e.target.value})} /></div>
+              <div className="input-group">
+                <label htmlFor="um-pw">{editing ? 'New Password (leave blank to keep)' : 'Password'}</label>
+                <input id="um-pw" type="password" className="input-field" required={false} minLength={form.password ? 8 : undefined} value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder={editing ? 'Leave blank to keep current password' : 'Leave blank to auto-generate'} />
+                {!editing && (
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                    If left blank, the system generates a random temporary password and emails it with a welcome message.
+                  </span>
+                )}
+              </div>
               <div className="grid-2">
                 <div className="input-group"><label htmlFor="um-sid">{form.role === 'student' ? 'Student ID' : 'Employee ID'}</label><input id="um-sid" className="input-field" value={form.role === 'student' ? (form.student_id || '') : (form.employee_id || '')} onChange={e => setForm({...form, [form.role === 'student' ? 'student_id' : 'employee_id']: e.target.value})} /></div>
                 <div className="input-group"><label htmlFor="um-prog">Program</label><select id="um-prog" className="input-field" value={form.program || ''} onChange={e => setForm({...form, program: e.target.value})}><option value="">Select...</option><option value="BSCE">BSCE</option><option value="BSEE">BSEE</option><option value="BSCpE">BSCpE</option><option value="BSME">BSME</option><option value="BSEcE">BSEcE</option></select></div>

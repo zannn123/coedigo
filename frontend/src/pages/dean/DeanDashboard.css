@@ -1,0 +1,262 @@
+.dean-dashboard-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.dean-student-workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.dean-roster-panel,
+.dean-transcript-panel {
+  min-height: 640px;
+}
+
+.dean-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dean-panel-head span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  margin-bottom: 0.25rem;
+}
+
+.dean-panel-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.dean-panel-head strong {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.dean-search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  margin-bottom: 1rem;
+}
+
+.dean-search-row svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.dean-search-row .input-field {
+  border: none;
+  background: transparent;
+  padding: 0;
+  min-height: 0;
+}
+
+.dean-search-row .input-field:focus {
+  box-shadow: none;
+}
+
+.dean-roster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 540px;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.dean-student-row {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  padding: 0.85rem 0.95rem;
+  text-align: left;
+  transition: border-color var(--transition), background var(--transition), transform var(--transition);
+}
+
+.dean-student-row:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.dean-student-row.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.dean-student-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.dean-student-row-top strong {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.dean-student-row-top span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
+.dean-student-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.7rem;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.dean-student-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.dean-student-summary div {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.dean-year-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dean-year-band {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.dean-year-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border);
+}
+
+.dean-year-head span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.dean-year-head h4 {
+  margin: 0.2rem 0 0;
+  font-size: 1rem;
+}
+
+.dean-year-head strong {
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+
+.dean-semester-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.dean-semester-section + .dean-semester-section {
+  border-top: 1px solid var(--border);
+}
+
+.dean-semester-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem 0.35rem;
+}
+
+.dean-semester-head h5 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.dean-semester-head span {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.dean-semester-section .table-container {
+  margin: 0;
+}
+
+.dean-empty-state {
+  min-height: 380px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  color: var(--text-secondary);
+  text-align: center;
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .dean-student-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .dean-roster-panel,
+  .dean-transcript-panel {
+    min-height: 0;
+  }
+
+  .dean-roster-list {
+    max-height: 320px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dean-search-row {
+    padding: 0.7rem 0.8rem;
+  }
+
+  .dean-year-head,
+  .dean-semester-head,
+  .dean-student-row-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dean-student-summary {
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+}

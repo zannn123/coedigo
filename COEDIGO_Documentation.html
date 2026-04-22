@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>COEDIGO Project Documentation</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      color: #1f2937;
+      margin: 44px;
+      line-height: 1.45;
+      font-size: 11pt;
+    }
+    h1, h2, h3 {
+      color: #111827;
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-size: 24pt;
+      margin-top: 0;
+    }
+    h2 {
+      font-size: 16pt;
+      margin-top: 24px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 4px;
+    }
+    h3 {
+      font-size: 12.5pt;
+      margin-top: 18px;
+    }
+    p {
+      margin: 8px 0;
+    }
+    ul, ol {
+      margin: 8px 0 8px 20px;
+    }
+    li {
+      margin: 4px 0;
+    }
+    code, pre {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 9.5pt;
+    }
+    pre {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      padding: 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border-radius: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 16px;
+    }
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f3f4f6;
+    }
+    .cover {
+      padding: 16px 0 22px;
+      border-bottom: 2px solid #d97706;
+    }
+    .cover p {
+      color: #4b5563;
+    }
+    .note {
+      background: #fff7ed;
+      border-left: 4px solid #d97706;
+      padding: 10px 12px;
+      margin: 12px 0;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+  <div class="cover">
+    <h1>COEDIGO Project Documentation</h1>
+    <p><strong>System:</strong> College of Engineering Digital Interface for Grading and Operations</p>
+    <p><strong>Institution:</strong> Jose Rizal Memorial State University - College of Engineering</p>
+    <p><strong>Repository:</strong> C:\Users\DjMhel\Documents\COEDIGO</p>
+    <p><strong>Prepared:</strong> April 22, 2026</p>
+  </div>
+
+  <h2>1. Project Summary</h2>
+  <p>
+    COEDIGO is a role-based academic records system for the College of Engineering. It provides login,
+    user management, class records, subject management, grade encoding, attendance tracking,
+    student grade viewing, audit logging, notifications, and email-based account onboarding.
+  </p>
+  <p>
+    The application is split into a React frontend and a PHP backend API with a MySQL database.
+    The frontend talks to the backend through the <code>/api</code> path.
+  </p>
+
+  <h2>2. Technology Stack</h2>
+  <table>
+    <tr>
+      <th>Layer</th>
+      <th>Technology</th>
+      <th>Notes</th>
+    </tr>
+    <tr>
+      <td>Frontend</td>
+      <td>React + Vite + TypeScript toolchain</td>
+      <td>Source is in <code>frontend/</code>. Build output is <code>frontend/dist/</code>.</td>
+    </tr>
+    <tr>
+      <td>Frontend libraries</td>
+      <td>axios, react-router-dom, lucide-react, recharts</td>
+      <td>Installed through <code>frontend/package.json</code>.</td>
+    </tr>
+    <tr>
+      <td>Backend</td>
+      <td>Plain PHP router and controllers</td>
+      <td>Main API entry point is <code>backend/index.php</code>.</td>
+    </tr>
+    <tr>
+      <td>Database</td>
+      <td>MySQL / MariaDB</td>
+      <td>Schema and seed data are in <code>database/coedigo.sql</code>.</td>
+    </tr>
+    <tr>
+      <td>Email delivery</td>
+      <td>Gmail SMTP / SMTP</td>
+      <td>Used for welcome emails when admins create accounts.</td>
+    </tr>
+    <tr>
+      <td>Local development</td>
+      <td>Vite dev server + PHP built-in server</td>
+      <td>Frontend uses port <code>5173</code>. Backend uses port <code>8000</code>.</td>
+    </tr>
+  </table>
+
+  <h2>3. Current Application Modules</h2>
+  <table>
+    <tr>
+      <th>Role</th>
+      <th>Main Routes</th>
+      <th>Purpose</th>
+    </tr>
+    <tr>
+      <td>Public</td>
+      <td><code>/login</code>, <code>/developers</code></td>
+      <td>Authentication and public developer page.</td>
+    </tr>
+    <tr>
+      <td>Admin</td>
+      <td><code>/admin</code>, <code>/admin/users</code>, <code>/admin/settings</code>, <code>/admin/audit-logs</code></td>
+      <td>User administration, mail settings, system settings, and activity logs.</td>
+    </tr>
+    <tr>
+      <td>Faculty</td>
+      <td><code>/faculty</code>, <code>/faculty/classes</code>, <code>/faculty/subjects</code>, <code>/faculty/classes/:classId</code></td>
+      <td>Class record management, subject handling, and grade encoding.</td>
+    </tr>
+    <tr>
+      <td>Student</td>
+      <td><code>/student</code>, <code>/student/subjects</code></td>
+      <td>Grade and attendance viewing, grouped by academic year and subject.</td>
+    </tr>
+    <tr>
+      <td>Dean / Program Chair</td>
+      <td><code>/dean</code></td>
+      <td>Monitoring and reporting dashboard.</td>
+    </tr>
+  </table>
+
+  <h2>4. Repository Structure</h2>
+  <pre>COEDIGO/
+|-- backend/
+|   |-- config/
+|   |-- controllers/
+|   |-- logs/
+|   |-- middleware/
+|   |-- utils/
+|   |-- .htaccess
+|   `-- index.php
+|-- database/
+|   `-- coedigo.sql
+|-- frontend/
+|   |-- public/
+|   |-- src/
+|   |-- .env.example
+|   |-- package.json
+|   `-- vite.config.js
+|-- scripts/
+|   `-- start-backend.ps1
+`-- COEDIGO_Documentation.html / COEDIGO_Documentation.pdf</pre>
+
+  <h2>5. System Requirements</h2>
+  <h3>5.1 Development Requirements</h3>
+  <ul>
+    <li>Node.js 18 or newer</li>
+    <li>npm</li>
+    <li>PHP 8.0 or newer</li>
+    <li>MySQL 8.x or MariaDB equivalent</li>
+    <li>Windows PowerShell for the provided backend start script</li>
+  </ul>
+
+  <h3>5.2 Required PHP Capabilities</h3>
+  <ul>
+    <li><code>pdo_mysql</code> for database access</li>
+    <li><code>json</code> support</li>
+    <li><code>mbstring</code> recommended</li>
+    <li><code>curl</code> recommended for SMTP delivery</li>
+    <li><code>openssl</code> for secure TLS/SSL SMTP connections</li>
+  </ul>
+
+  <h3>5.3 Default Database Configuration in Code</h3>
+  <p>The backend uses these defaults when environment variables are not set:</p>
+  <table>
+    <tr>
+      <th>Variable</th>
+      <th>Default</th>
+    </tr>
+    <tr>
+      <td><code>DB_HOST</code></td>
+      <td><code>localhost</code></td>
+    </tr>
+    <tr>
+      <td><code>DB_NAME</code></td>
+      <td><code>coedigo_db</code></td>
+    </tr>
+    <tr>
+      <td><code>DB_USER</code></td>
+      <td><code>root</code></td>
+    </tr>
+    <tr>
+      <td><code>DB_PASS</code></td>
+      <td>empty string</td>
+    </tr>
+  </table>
+
+  <h2>6. Database Setup</h2>
+  <ol>
+    <li>Create a MySQL database server instance if one is not already available.</li>
+    <li>Import <code>database/coedigo.sql</code> into MySQL or MariaDB.</li>
+    <li>Confirm that the database name is <code>coedigo_db</code>, or set environment variables to match your actual database name.</li>
+    <li>Verify that the following tables exist after import:
+      <ul>
+        <li><code>users</code></li>
+        <li><code>subjects</code></li>
+        <li><code>class_records</code></li>
+        <li><code>enrollments</code></li>
+        <li><code>attendance_records</code></li>
+        <li><code>grade_components</code></li>
+        <li><code>grades</code></li>
+        <li><code>notifications</code></li>
+        <li><code>audit_logs</code></li>
+        <li><code>system_settings</code></li>
+      </ul>
+    </li>
+  </ol>
+
+  <h3>6.1 Default Seeded Admin Account</h3>
+  <table>
+    <tr>
+      <th>Field</th>
+      <th>Value</th>
+    </tr>
+    <tr>
+      <td>Email</td>
+      <td><code>admin@jrmsu.edu.ph</code></td>
+    </tr>
+    <tr>
+      <td>Password</td>
+      <td><code>admin123</code></td>
+    </tr>
+    <tr>
+      <td>Role</td>
+      <td><code>admin</code></td>
+    </tr>
+  </table>
+  <div class="note">
+    Change the default admin password immediately after first deployment. Do not leave the seeded password active in production.
+  </div>
+
+  <h2>7. Local Development Startup Guide</h2>
+  <h3>7.1 Install Frontend Dependencies</h3>
+  <pre>cd C:\Users\DjMhel\Documents\COEDIGO\frontend
+npm install</pre>
+
+  <h3>7.2 Start the Full Local Stack</h3>
+  <p>The fastest local startup is the combined frontend command:</p>
+  <pre>cd C:\Users\DjMhel\Documents\COEDIGO\frontend
+npm run dev:fullstack</pre>
+  <p>This does two things:</p>
+  <ul>
+    <li>Starts the PHP backend on <code>http://127.0.0.1:8000</code></li>
+    <li>Starts the Vite frontend on <code>http://127.0.0.1:5173</code></li>
+  </ul>
+
+  <h3>7.3 Start Backend Only</h3>
+  <pre>cd C:\Users\DjMhel\Documents\COEDIGO\frontend
+npm run dev:backend</pre>
+
+  <h3>7.4 Start Frontend Only</h3>
+  <pre>cd C:\Users\DjMhel\Documents\COEDIGO\frontend
+npm run dev</pre>
+
+  <h3>7.5 Backend Startup Logic</h3>
+  <p>
+    The script <code>scripts/start-backend.ps1</code> searches for <code>php.exe</code> in PATH and common XAMPP locations,
+    then starts the PHP built-in server with <code>backend/index.php</code> as the router on port <code>8000</code>.
+  </p>
+
+  <h3>7.6 Local URLs</h3>
+  <table>
+    <tr>
+      <th>Service</th>
+      <th>URL</th>
+    </tr>
+    <tr>
+      <td>Frontend</td>
+      <td><code>http://127.0.0.1:5173</code></td>
+    </tr>
+    <tr>
+      <td>Backend API</td>
+      <td><code>http://127.0.0.1:8000/api</code></td>
+    </tr>
+    <tr>
+      <td>Login page</td>
+      <td><code>http://127.0.0.1:5173/login</code></td>
+    </tr>
+  </table>
+
+  <h2>8. Frontend API Configuration</h2>
+  <p>The frontend supports two API connection modes.</p>
+  <table>
+    <tr>
+      <th>Variable</th>
+      <th>Purpose</th>
+      <th>Example</th>
+    </tr>
+    <tr>
+      <td><code>VITE_API_PROXY_TARGET</code></td>
+      <td>Vite dev proxy target for local development</td>
+      <td><code>http://127.0.0.1:8000</code></td>
+    </tr>
+    <tr>
+      <td><code>VITE_API_BASE_URL</code></td>
+      <td>Direct API base URL, usually used in production or special local setups</td>
+      <td><code>https://your-domain/api</code></td>
+    </tr>
+  </table>
+
+  <p>Reference file:</p>
+  <pre>frontend/.env.example</pre>
+
+  <h2>9. Authentication and User Behavior</h2>
+  <ul>
+    <li>Login is handled by <code>POST /api/auth/login</code>.</li>
+    <li>The backend checks email, password hash, and account active status.</li>
+    <li>Inactive accounts are not permanently removed by default. They are soft-deactivated through <code>is_active = 0</code>.</li>
+    <li>Disabled users receive this login message:
+      <br /><code>Account disabled. Please contact your program chair or the College of Engineering faculty office.</code>
+    </li>
+    <li>Successful login returns a token and a role-specific user profile.</li>
+  </ul>
+
+  <h2>10. Email Delivery After Account Creation</h2>
+  <p>
+    When an admin creates a user, the system can send a welcome email using Gmail SMTP or another SMTP server.
+    If the admin leaves the password blank during account creation, the system generates a random temporary password.
+  </p>
+
+  <h3>10.1 Required Settings</h3>
+  <table>
+    <tr>
+      <th>Setting</th>
+      <th>Description</th>
+    </tr>
+    <tr>
+      <td><code>smtp_host</code></td>
+      <td>SMTP host, typically <code>smtp.gmail.com</code></td>
+    </tr>
+    <tr>
+      <td><code>smtp_port</code></td>
+      <td>SMTP port, usually <code>465</code> for SSL or <code>587</code> for TLS</td>
+    </tr>
+    <tr>
+      <td><code>smtp_username</code></td>
+      <td>Full Gmail address or SMTP username</td>
+    </tr>
+    <tr>
+      <td><code>smtp_password</code></td>
+      <td>Gmail app password or SMTP password</td>
+    </tr>
+    <tr>
+      <td><code>smtp_encryption</code></td>
+      <td><code>ssl</code>, <code>tls</code>, or <code>none</code></td>
+    </tr>
+    <tr>
+      <td><code>mail_from_address</code></td>
+      <td>Sender email address, usually the same as the Gmail address</td>
+    </tr>
+    <tr>
+      <td><code>mail_from_name</code></td>
+      <td>Display name for outgoing emails</td>
+    </tr>
+    <tr>
+      <td><code>mail_reply_to</code></td>
+      <td>Optional reply-to address</td>
+    </tr>
+  </table>
+
+  <h3>10.2 Where to Configure Mail</h3>
+  <ul>
+    <li>Admin panel: System Settings</li>
+    <li>Environment fallback values:
+      <ul>
+        <li><code>SMTP_HOST</code></li>
+        <li><code>SMTP_PORT</code></li>
+        <li><code>SMTP_USERNAME</code></li>
+        <li><code>SMTP_PASSWORD</code></li>
+        <li><code>SMTP_ENCRYPTION</code></li>
+        <li><code>MAIL_FROM_ADDRESS</code></li>
+        <li><code>MAIL_FROM_NAME</code></li>
+        <li><code>MAIL_REPLY_TO</code></li>
+      </ul>
+    </li>
+  </ul>
+
+  <h3>10.3 Mail Delivery Notes</h3>
+  <ul>
+    <li>The backend uses cURL for SMTP if available.</li>
+    <li>If cURL is missing, it falls back to raw SMTP sockets.</li>
+    <li>The server must be able to reach your SMTP host, such as <code>smtp.gmail.com</code>.</li>
+  </ul>
+
+  <h2>11. Logging and Diagnostics</h2>
+  <h3>11.1 Backend Application Logs</h3>
+  <p>Application events are written to:</p>
+  <pre>backend/logs/app-YYYY-MM-DD.log</pre>
+
+  <h3>11.2 PHP Built-in Server Logs</h3>
+  <p>When using the local start script, PHP server output is written to:</p>
+  <pre>backend/logs/php-server.out.log
+backend/logs/php-server.err.log</pre>
+
+  <h3>11.3 Examples of Important Log Events</h3>
+  <ul>
+    <li><code>database.connection.failed</code></li>
+    <li><code>user.create.success</code></li>
+    <li><code>user.create.failed</code></li>
+    <li><code>user.create.email_failed</code></li>
+    <li><code>mail.welcome.sent</code></li>
+    <li><code>mail.welcome.failed</code></li>
+    <li><code>mail.smtp.response_error</code></li>
+  </ul>
+
+  <h2>12. Common Troubleshooting</h2>
+  <h3>12.1 Login Fails Even When the User Exists</h3>
+  <ol>
+    <li>Confirm that the frontend can reach the backend.</li>
+    <li>Check that the backend is running on <code>127.0.0.1:8000</code>.</li>
+    <li>Check that the frontend Vite server is running on <code>127.0.0.1:5173</code>.</li>
+    <li>Verify the database credentials in the backend environment.</li>
+    <li>Verify that the account is active by checking <code>users.is_active = 1</code>.</li>
+    <li>Verify that the password in the database is a valid PHP password hash.</li>
+  </ol>
+
+  <h3>12.2 Account Creation Succeeds in UI But Row Is Missing</h3>
+  <ol>
+    <li>Check whether the frontend is talking to the same backend instance you are inspecting.</li>
+    <li>Confirm that the backend is connected to the same database you are viewing in phpMyAdmin.</li>
+    <li>Review <code>backend/logs/app-YYYY-MM-DD.log</code> for user creation errors.</li>
+  </ol>
+
+  <h3>12.3 Email Not Sent</h3>
+  <ol>
+    <li>Verify SMTP settings in Admin &gt; System Settings.</li>
+    <li>Verify that the Gmail account has 2-Step Verification and a valid app password.</li>
+    <li>Check backend logs for <code>mail.welcome.failed</code> or <code>mail.smtp.response_error</code>.</li>
+    <li>Verify outbound SMTP access to <code>smtp.gmail.com</code> on port <code>465</code> or <code>587</code>.</li>
+  </ol>
+
+  <div class="page-break"></div>
+
+  <h2>13. Production Deployment Guide</h2>
+  <p>
+    The cleanest production deployment is to host the frontend and backend under the same domain,
+    with the backend exposed under the <code>/api</code> path.
+  </p>
+
+  <h3>13.1 Recommended Production Architecture</h3>
+  <ul>
+    <li>Frontend: static files from <code>frontend/dist/</code></li>
+    <li>Backend: PHP application in <code>backend/</code></li>
+    <li>Database: MySQL or MariaDB on the same server or a managed DB server</li>
+    <li>HTTPS: required</li>
+  </ul>
+
+  <h3>13.2 Recommended Production Environment Variables</h3>
+  <table>
+    <tr>
+      <th>Variable</th>
+      <th>Purpose</th>
+    </tr>
+    <tr>
+      <td><code>DB_HOST</code></td>
+      <td>Database host</td>
+    </tr>
+    <tr>
+      <td><code>DB_NAME</code></td>
+      <td>Database name</td>
+    </tr>
+    <tr>
+      <td><code>DB_USER</code></td>
+      <td>Database user</td>
+    </tr>
+    <tr>
+      <td><code>DB_PASS</code></td>
+      <td>Database password</td>
+    </tr>
+    <tr>
+      <td><code>SMTP_HOST</code></td>
+      <td>SMTP host</td>
+    </tr>
+    <tr>
+      <td><code>SMTP_PORT</code></td>
+      <td>SMTP port</td>
+    </tr>
+    <tr>
+      <td><code>SMTP_USERNAME</code></td>
+      <td>SMTP username or Gmail address</td>
+    </tr>
+    <tr>
+      <td><code>SMTP_PASSWORD</code></td>
+      <td>SMTP password or Gmail app password</td>
+    </tr>
+    <tr>
+      <td><code>SMTP_ENCRYPTION</code></td>
+      <td>SMTP encryption mode</td>
+    </tr>
+    <tr>
+      <td><code>MAIL_FROM_ADDRESS</code></td>
+      <td>Sender email</td>
+    </tr>
+    <tr>
+      <td><code>MAIL_FROM_NAME</code></td>
+      <td>Sender display name</td>
+    </tr>
+    <tr>
+      <td><code>MAIL_REPLY_TO</code></td>
+      <td>Optional reply-to address</td>
+    </tr>
+  </table>
+
+  <h3>13.3 Build the Frontend for Production</h3>
+  <pre>cd C:\Users\DjMhel\Documents\COEDIGO\frontend
+npm install
+npm run build</pre>
+  <p>Deploy the contents of <code>frontend/dist/</code> to your web server.</p>
+
+  <h3>13.4 Frontend Production API URL</h3>
+  <p>
+    If frontend and backend are served from different origins, build the frontend with
+    <code>VITE_API_BASE_URL</code> set to the real backend endpoint, for example:
+  </p>
+  <pre>VITE_API_BASE_URL=https://coedigo.example.edu/api</pre>
+
+  <h3>13.5 Apache Deployment Notes</h3>
+  <ul>
+    <li>Point the frontend site root to the built frontend files.</li>
+    <li>Expose the PHP backend under <code>/api</code>.</li>
+    <li>Keep <code>backend/.htaccess</code> active so non-file API routes are rewritten to <code>backend/index.php</code>.</li>
+    <li>Enable Apache rewrite support.</li>
+  </ul>
+
+  <h3>13.6 Example Apache Layout</h3>
+  <pre>DocumentRoot /var/www/coedigo/frontend/dist
+
+/var/www/coedigo/frontend/dist         -> static frontend build
+/var/www/coedigo/backend               -> PHP API application
+https://your-domain/                  -> frontend
+https://your-domain/api/...           -> backend/index.php router</pre>
+
+  <h3>13.7 Nginx Deployment Notes</h3>
+  <p>
+    Nginx is also valid, but you must replicate the rewrite behavior currently provided by
+    <code>backend/.htaccess</code>. All API requests that are not actual files should be passed to
+    <code>backend/index.php</code>.
+  </p>
+
+  <h3>13.8 File and Folder Permissions</h3>
+  <ul>
+    <li>The web server must be able to read all backend and frontend files.</li>
+    <li>The backend process must be able to write to <code>backend/logs/</code>.</li>
+    <li>Do not expose internal backend logs publicly over HTTP.</li>
+  </ul>
+
+  <h3>13.9 SSL and Security Baseline</h3>
+  <ul>
+    <li>Use HTTPS only in production.</li>
+    <li>Replace the hard-coded JWT secret in <code>backend/middleware/AuthMiddleware.php</code> with a production-managed secret.</li>
+    <li>Change the default admin password.</li>
+    <li>Use a database user with only the required permissions.</li>
+    <li>Restrict public access to phpMyAdmin or remove it from production.</li>
+  </ul>
+
+  <h3>13.10 Backup Strategy</h3>
+  <ul>
+    <li>Back up the MySQL database daily.</li>
+    <li>Back up the <code>backend/logs/</code> directory if audit trace retention is required.</li>
+    <li>Back up any uploaded assets if file uploads are added later.</li>
+  </ul>
+
+  <h2>14. Release Procedure for Future Updates</h2>
+  <ol>
+    <li>Pull the latest repository changes into a staging environment.</li>
+    <li>Run database updates if the schema changed.</li>
+    <li>Install frontend dependencies and rebuild the frontend.</li>
+    <li>Deploy <code>frontend/dist/</code> and backend PHP files.</li>
+    <li>Verify login, user creation, grade views, and email delivery in staging.</li>
+    <li>Deploy to production during a controlled maintenance window if needed.</li>
+    <li>Monitor error logs immediately after release.</li>
+  </ol>
+
+  <h2>15. Suggested Future Improvements</h2>
+  <ul>
+    <li>Move the JWT secret out of source code into an environment variable.</li>
+    <li>Add database migrations instead of relying only on the full SQL schema file.</li>
+    <li>Add automated tests for authentication, account creation, and grading flows.</li>
+    <li>Add a production health check endpoint.</li>
+    <li>Add a test-email button in System Settings to validate Gmail SMTP before onboarding users.</li>
+  </ul>
+
+  <h2>16. Operational Checklist</h2>
+  <table>
+    <tr>
+      <th>Check</th>
+      <th>Status to Confirm</th>
+    </tr>
+    <tr>
+      <td>Database imported</td>
+      <td><code>coedigo_db</code> exists and tables are present</td>
+    </tr>
+    <tr>
+      <td>Backend reachable</td>
+      <td><code>/api/auth/login</code> responds</td>
+    </tr>
+    <tr>
+      <td>Frontend reachable</td>
+      <td>Login page loads</td>
+    </tr>
+    <tr>
+      <td>Admin login works</td>
+      <td>Seeded admin or production admin can sign in</td>
+    </tr>
+    <tr>
+      <td>Logs writable</td>
+      <td><code>backend/logs</code> receives entries</td>
+    </tr>
+    <tr>
+      <td>Email settings configured</td>
+      <td>SMTP settings saved and Gmail app password verified</td>
+    </tr>
+  </table>
+
+  <h2>17. Document Maintenance</h2>
+  <p>
+    This documentation was generated from the current repository state on April 22, 2026.
+    Update this document whenever startup commands, deployment topology, database schema,
+    or environment variables change.
+  </p>
+</body>
+</html>

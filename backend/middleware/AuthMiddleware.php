@@ -78,6 +78,22 @@ class AuthMiddleware {
             Response::error('Invalid or expired token. Please login again.', 401);
         }
 
+        require_once __DIR__ . '/../config/database.php';
+        require_once __DIR__ . '/../utils/Response.php';
+
+        try {
+            $db = (new Database())->getConnection();
+            $stmt = $db->prepare("SELECT is_active FROM users WHERE id = ?");
+            $stmt->execute([$decoded['sub']]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user || (int)$user['is_active'] !== 1) {
+                Response::error('Account disabled. Please contact your program chair or the College of Engineering faculty office.', 401);
+            }
+        } catch (Exception $e) {
+            Response::error('Authentication check failed. Please login again.', 401);
+        }
+
         return $decoded;
     }
 

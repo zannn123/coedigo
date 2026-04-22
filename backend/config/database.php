@@ -4,6 +4,8 @@
  * College of Engineering Digital Interface for Grading and Operations
  */
 
+require_once __DIR__ . '/../utils/Logger.php';
+
 class Database {
     private $host;
     private $db_name;
@@ -32,6 +34,12 @@ class Database {
                 ]
             );
         } catch (PDOException $e) {
+            Logger::error('database.connection.failed', [
+                'host' => $this->host,
+                'database' => $this->db_name,
+                'username' => $this->username,
+                'message' => $e->getMessage(),
+            ]);
             http_response_code(500);
             echo json_encode([
                 'success' => false,

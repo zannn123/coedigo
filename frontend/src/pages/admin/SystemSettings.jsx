@@ -3,14 +3,33 @@ import api from '../../services/api';
 import { Shield, Save } from 'lucide-react';
 
 export default function SystemSettings() {
-  const [settings, setSettings] = useState({});
+  const defaultSettings = {
+    institution_name: '',
+    college_name: '',
+    current_academic_year: '',
+    current_semester: '1st',
+    major_exam_weight: '',
+    quiz_weight: '',
+    project_weight: '',
+    passing_grade: '',
+    smtp_host: 'smtp.gmail.com',
+    smtp_port: '465',
+    smtp_username: '',
+    smtp_password: '',
+    smtp_encryption: 'ssl',
+    mail_from_address: '',
+    mail_from_name: 'COEDIGO',
+    mail_reply_to: '',
+  };
+
+  const [settings, setSettings] = useState(defaultSettings);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
     api.get('/settings').then(r => {
       const map = {};
       r.data.data?.forEach(s => { map[s.setting_key] = s.setting_value; });
-      setSettings(map);
+      setSettings(prev => ({ ...prev, ...map }));
     }).catch(() => {});
   }, []);
 
@@ -51,6 +70,42 @@ export default function SystemSettings() {
             <div className="input-group"><label>Quizzes (%)</label><input type="number" className="input-field" min="0" max="100" value={settings.quiz_weight || ''} onChange={e => update('quiz_weight', e.target.value)} /></div>
             <div className="input-group"><label>Projects/Outputs (%)</label><input type="number" className="input-field" min="0" max="100" value={settings.project_weight || ''} onChange={e => update('project_weight', e.target.value)} /></div>
             <div className="input-group"><label>Passing Grade</label><input className="input-field" value={settings.passing_grade || ''} onChange={e => update('passing_grade', e.target.value)} /></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: '1rem' }}>
+        <h3 style={{ marginBottom: '1.25rem' }}>Email Delivery</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem' }}>
+          Use Gmail SMTP with an app password so new accounts receive their temporary password automatically.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="grid-2">
+            <div className="input-group"><label>SMTP Host</label><input className="input-field" value={settings.smtp_host || ''} onChange={e => update('smtp_host', e.target.value)} placeholder="smtp.gmail.com" /></div>
+            <div className="input-group"><label>SMTP Port</label><input type="number" className="input-field" value={settings.smtp_port || ''} onChange={e => update('smtp_port', e.target.value)} placeholder="465" /></div>
+          </div>
+          <div className="grid-2">
+            <div className="input-group">
+              <label>Encryption</label>
+              <select className="input-field" value={settings.smtp_encryption || 'ssl'} onChange={e => update('smtp_encryption', e.target.value)}>
+                <option value="ssl">SSL</option>
+                <option value="tls">TLS / STARTTLS</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+            <div className="input-group"><label>Gmail Address / SMTP Username</label><input type="email" className="input-field" value={settings.smtp_username || ''} onChange={e => update('smtp_username', e.target.value)} placeholder="youraccount@gmail.com" /></div>
+          </div>
+          <div className="input-group">
+            <label>App Password / SMTP Password</label>
+            <input type="password" className="input-field" value={settings.smtp_password || ''} onChange={e => update('smtp_password', e.target.value)} placeholder="16-character app password" />
+          </div>
+          <div className="grid-2">
+            <div className="input-group"><label>From Name</label><input className="input-field" value={settings.mail_from_name || ''} onChange={e => update('mail_from_name', e.target.value)} /></div>
+            <div className="input-group"><label>From Email</label><input type="email" className="input-field" value={settings.mail_from_address || ''} onChange={e => update('mail_from_address', e.target.value)} placeholder="leave blank to use Gmail address" /></div>
+          </div>
+          <div className="input-group">
+            <label>Reply-To Email</label>
+            <input type="email" className="input-field" value={settings.mail_reply_to || ''} onChange={e => update('mail_reply_to', e.target.value)} placeholder="optional support address" />
           </div>
         </div>
       </div>

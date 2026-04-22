@@ -9,8 +9,29 @@ export default function StudentDashboard() {
   const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
-    api.get('/grades/student').then(r => setGrades(r.data.data || []));
-    api.get('/notifications?limit=5').then(r => setNotifications(r.data.data || []));
+    let active = true;
+
+    const loadDashboard = () => {
+      api.get('/grades/student')
+        .then(r => {
+          if (active) setGrades(r.data.data || []);
+        })
+        .catch(() => {});
+
+      api.get('/notifications?limit=5')
+        .then(r => {
+          if (active) setNotifications(r.data.data || []);
+        })
+        .catch(() => {});
+    };
+
+    loadDashboard();
+    const intervalId = window.setInterval(loadDashboard, 15000);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   const released = grades.filter(g => g.grade_status === 'officially_released' && g.final_grade);
@@ -24,6 +45,9 @@ export default function StudentDashboard() {
       <div className="page-header">
         <h1>Welcome, {user?.first_name}!</h1>
         <p>{user?.program || 'Student'} - {user?.student_id || ''}</p>
+        <p style={{ marginTop:'0.5rem', color:'var(--text-secondary)', fontSize:'0.875rem' }}>
+          Live score updates and notifications refresh automatically while this page is open.
+        </p>
       </div>
 
       <div className="grid-4" style={{ marginBottom:'2rem' }}>
