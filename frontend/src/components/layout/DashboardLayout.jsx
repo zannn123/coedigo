@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { GraduationCap, Menu, X, LogOut, Bell, ChevronDown } from 'lucide-react';
+import { Menu, X, LogOut, Bell, ChevronDown } from 'lucide-react';
 import './DashboardLayout.css';
 
 export default function DashboardLayout({ navItems }) {
@@ -49,7 +49,7 @@ export default function DashboardLayout({ navItems }) {
         <div className="sidebar-header">
           <div className="sidebar-brand">
             <div className="brand-icon">
-              <GraduationCap size={24} strokeWidth={1.8} />
+              <img src="/coedigo-brand-logo.png" alt="COEDIGO" />
             </div>
             <div>
               <span className="brand-name">C.O.E.D.I.G.O.</span>

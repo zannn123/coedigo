@@ -76,7 +76,7 @@ export default function DeanDashboard() {
         <div className="card">
           <h3 style={{ marginBottom:'1rem' }}>Grade Status Distribution</h3>
           {pieData.length ? (
-            <div style={{ display:'flex',alignItems:'center',justifyContent:'center',gap:'2rem' }}>
+            <div className="chart-split">
               <ResponsiveContainer width={180} height={180}>
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value" stroke="var(--bg-primary)" strokeWidth={2}>

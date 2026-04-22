@@ -1,0 +1,17 @@
+{
+  "name": "C.O.E.D.I.G.O.",
+  "short_name": "COEDIGO",
+  "description": "College of Engineering Digital Interface for Grading and Operations",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8F9FA",
+  "theme_color": "#D4650B",
+  "icons": [
+    {
+      "src": "/coedigo-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

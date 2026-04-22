@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
-import { ArrowLeft, UserPlus, Calculator, CheckCircle, Send, X, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, UserPlus, Calculator, CheckCircle, Send, X, Plus, Trash2, CalendarDays, ClipboardCheck } from 'lucide-react';
 
 export default function GradeBook() {
   const { classId } = useParams();
@@ -13,6 +13,9 @@ export default function GradeBook() {
   const [showEncode, setShowEncode] = useState(null);
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [components, setComponents] = useState([]);
+  const [deletedComponentIds, setDeletedComponentIds] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [deletedAttendanceIds, setDeletedAttendanceIds] = useState([]);
   const [searchStudent, setSearchStudent] = useState('');
   const [toast, setToast] = useState(null);
 
@@ -41,24 +44,59 @@ export default function GradeBook() {
 
   const openEncode = (student) => {
     setShowEncode(student);
-    setComponents(student.components?.length ? student.components.map(c => ({...c})) : [
+    setDeletedComponentIds([]);
+    setDeletedAttendanceIds([]);
+    const editableComponents = (student.components || []).filter(c => c.component_name !== 'Attendance');
+    setAttendance((student.attendance || []).map(a => ({ ...a })));
+    setComponents(editableComponents.length ? editableComponents.map(c => ({...c})) : [
       { category:'major_exam', component_name:'Midterm Exam', max_score:100, score:'' },
       { category:'major_exam', component_name:'Final Exam', max_score:100, score:'' },
       { category:'quiz', component_name:'Quiz 1', max_score:50, score:'' },
       { category:'quiz', component_name:'Quiz 2', max_score:50, score:'' },
       { category:'project', component_name:'Project 1', max_score:100, score:'' },
-      { category:'project', component_name:'Attendance', max_score:100, score:'' },
     ]);
   };
 
   const addComponent = (cat) => { setComponents([...components, { category: cat, component_name: '', max_score: 100, score: '' }]); };
-  const removeComponent = (i) => { setComponents(components.filter((_, idx) => idx !== i)); };
+  const removeComponent = (i) => {
+    const removed = components[i];
+    if (removed?.id) setDeletedComponentIds(ids => [...ids, removed.id]);
+    setComponents(components.filter((_, idx) => idx !== i));
+  };
   const updateComp = (i, field, val) => { const c = [...components]; c[i][field] = val; setComponents(c); };
+  const updateAttendance = (i, field, val) => { const rows = [...attendance]; rows[i][field] = val; setAttendance(rows); };
+  const addAttendance = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    setAttendance([...attendance, { attendance_date: today, status: 'present' }]);
+  };
+  const removeAttendance = (i) => {
+    const removed = attendance[i];
+    if (removed?.id) setDeletedAttendanceIds(ids => [...ids, removed.id]);
+    setAttendance(attendance.filter((_, idx) => idx !== i));
+  };
 
   const handleEncode = async () => {
     try {
-      await api.post('/grades/encode', { enrollment_id: showEncode.enrollment_id, components: components.map(c => ({...c, score: c.score === '' ? null : parseFloat(c.score)})) });
-      await api.post(`/grades/compute/${showEncode.enrollment_id}`);
+      await Promise.all(deletedComponentIds.map(id => api.delete(`/grades/component/${id}`)));
+      const validComponents = components.filter(c => c.component_name?.trim());
+      if (validComponents.length) {
+        await api.post('/grades/encode', {
+          enrollment_id: showEncode.enrollment_id,
+          components: validComponents.map(c => ({
+            ...c,
+            component_name: c.component_name.trim(),
+            max_score: c.max_score === '' ? 0 : parseFloat(c.max_score),
+            score: c.score === '' ? null : parseFloat(c.score)
+          }))
+        });
+      }
+      await api.post('/grades/attendance', {
+        enrollment_id: showEncode.enrollment_id,
+        attendance: attendance
+          .filter(a => a.attendance_date)
+          .map(a => ({ id: a.id, attendance_date: a.attendance_date, status: a.status || 'absent' })),
+        delete_ids: deletedAttendanceIds
+      });
       showToast('Scores saved & grade computed.');
       setShowEncode(null); fetchData();
     } catch(e) { showToast(e.response?.data?.message||'Error','error'); }
@@ -76,6 +114,11 @@ export default function GradeBook() {
 
   const catLabels = { major_exam: 'Major Exams (40%)', quiz: 'Quizzes (30%)', project: 'Projects/Outputs (30%)' };
   const statusBadge = { draft:'badge-warning', faculty_verified:'badge-info', officially_released:'badge-success' };
+  const attendanceStats = rows => {
+    const total = rows.length;
+    const present = rows.filter(r => r.status === 'present').length;
+    return { total, present, percentage: total ? Math.round((present / total) * 100) : null };
+  };
 
   if (!classData) return <div className="empty-state">Loading...</div>;
 
@@ -101,7 +144,7 @@ export default function GradeBook() {
 
       <div className="table-container">
         <table>
-          <thead><tr><th>#</th><th>Student No.</th><th>Name</th><th>Program</th><th>Exams</th><th>Quizzes</th><th>Projects</th><th>Weighted</th><th>Grade</th><th>Remarks</th><th>Action</th></tr></thead>
+          <thead><tr><th>#</th><th>Student No.</th><th>Name</th><th>Program</th><th>Exams</th><th>Quizzes</th><th>Projects</th><th>Attendance</th><th>Weighted</th><th>Grade</th><th>Remarks</th><th>Action</th></tr></thead>
           <tbody>
             {grades.map((s, i) => (
               <tr key={s.enrollment_id}>
@@ -112,13 +155,18 @@ export default function GradeBook() {
                 <td>{s.grade?.major_exam_avg != null ? parseFloat(s.grade.major_exam_avg).toFixed(1)+'%' : '—'}</td>
                 <td>{s.grade?.quiz_avg != null ? parseFloat(s.grade.quiz_avg).toFixed(1)+'%' : '—'}</td>
                 <td>{s.grade?.project_avg != null ? parseFloat(s.grade.project_avg).toFixed(1)+'%' : '—'}</td>
+                <td>
+                  {s.attendance_summary?.total_sessions
+                    ? <span style={{ fontWeight:600 }}>{parseFloat(s.attendance_summary.total_points).toFixed(0)}/{s.attendance_summary.possible_points} pts</span>
+                    : <span style={{ color:'var(--text-muted)' }}>—</span>}
+                </td>
                 <td style={{ fontWeight:600 }}>{s.grade?.weighted_score != null ? parseFloat(s.grade.weighted_score).toFixed(1)+'%' : '—'}</td>
                 <td style={{ fontWeight:700, color: s.grade?.final_grade <= 3 ? 'var(--success)' : s.grade?.final_grade ? 'var(--danger)' : 'var(--text-muted)' }}>{s.grade?.final_grade ?? '—'}</td>
                 <td><span className={`badge ${s.grade?.remarks==='Passed'?'badge-success':s.grade?.remarks==='Failed'?'badge-danger':'badge-warning'}`}>{s.grade?.remarks||'No Grade'}</span></td>
-                <td><button className="btn btn-secondary btn-sm" onClick={() => openEncode(s)}>Encode</button></td>
+                <td><button className="btn btn-secondary btn-sm" onClick={() => openEncode(s)}><ClipboardCheck size={14}/>Encode</button></td>
               </tr>
             ))}
-            {!grades.length && <tr><td colSpan={11} className="empty-state">No students enrolled</td></tr>}
+            {!grades.length && <tr><td colSpan={12} className="empty-state">No students enrolled</td></tr>}
           </tbody>
         </table>
       </div>
@@ -146,7 +194,7 @@ export default function GradeBook() {
       {/* Encode Modal */}
       {showEncode && (
         <div className="modal-overlay" onClick={() => setShowEncode(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth:'650px' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth:'920px' }}>
             <div className="flex-between" style={{ marginBottom:'1rem' }}><h2>Encode: {showEncode.last_name}, {showEncode.first_name}</h2><button className="btn btn-ghost btn-sm" onClick={() => setShowEncode(null)}><X size={18}/></button></div>
             {['major_exam','quiz','project'].map(cat => (
               <div key={cat} style={{ marginBottom:'1.5rem' }}>
@@ -157,7 +205,7 @@ export default function GradeBook() {
                 {components.filter(c=>c.category===cat).map((comp, ci) => {
                   const idx = components.indexOf(comp);
                   return (
-                    <div key={idx} className="flex-gap" style={{ marginBottom:'0.5rem' }}>
+                    <div key={idx} className="flex-gap score-component-row" style={{ marginBottom:'0.5rem' }}>
                       <input className="input-field" style={{ flex:2 }} placeholder="Name" value={comp.component_name} onChange={e => updateComp(idx,'component_name',e.target.value)} />
                       <input type="number" className="input-field" style={{ width:'80px' }} placeholder="Max" value={comp.max_score} onChange={e => updateComp(idx,'max_score',e.target.value)} />
                       <input type="number" className="input-field" style={{ width:'80px' }} placeholder="Score" value={comp.score} onChange={e => updateComp(idx,'score',e.target.value)} />
@@ -167,6 +215,39 @@ export default function GradeBook() {
                 })}
               </div>
             ))}
+            <div style={{ marginBottom:'1.5rem' }}>
+              <div className="flex-between" style={{ marginBottom:'0.75rem' }}>
+                <div>
+                  <h3 style={{ fontSize:'0.9375rem', display:'flex', alignItems:'center', gap:'0.5rem' }}><CalendarDays size={16}/>Attendance Dates</h3>
+                  <p style={{ color:'var(--text-secondary)', fontSize:'0.8125rem' }}>Present marks count as 1 point each.</p>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={addAttendance}><Plus size={14}/> Add Date</button>
+              </div>
+              {(() => {
+                const stats = attendanceStats(attendance);
+                return (
+                  <div className="metric-strip" style={{ marginBottom:'0.75rem' }}>
+                    <div><strong>{stats.present}</strong><span>Present Points</span></div>
+                    <div><strong>{stats.total}</strong><span>Class Dates</span></div>
+                    <div><strong>{stats.percentage ?? '—'}{stats.percentage != null ? '%' : ''}</strong><span>Attendance Rate</span></div>
+                  </div>
+                );
+              })()}
+              <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem' }}>
+                {attendance.map((row, idx) => (
+                  <div key={row.id || idx} className="attendance-row">
+                    <input type="date" className="input-field" value={row.attendance_date || ''} onChange={e => updateAttendance(idx, 'attendance_date', e.target.value)} />
+                    <select className="input-field" value={row.status || 'absent'} onChange={e => updateAttendance(idx, 'status', e.target.value)}>
+                      <option value="present">Present</option>
+                      <option value="absent">Absent</option>
+                    </select>
+                    <span className={`badge ${row.status === 'present' ? 'badge-success' : 'badge-danger'}`}>{row.status === 'present' ? '+1 point' : '0 point'}</span>
+                    <button className="btn btn-ghost btn-sm" onClick={() => removeAttendance(idx)}><Trash2 size={14}/></button>
+                  </div>
+                ))}
+                {!attendance.length && <div className="empty-state" style={{ padding:'1rem' }}>No attendance dates encoded yet</div>}
+              </div>
+            </div>
             <button className="btn btn-primary" style={{ width:'100%' }} onClick={handleEncode}>Save & Compute Grade</button>
           </div>
         </div>

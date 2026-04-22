@@ -11,8 +11,9 @@ import ClassManagement from './pages/faculty/ClassManagement';
 import SubjectManagement from './pages/faculty/SubjectManagement';
 import GradeBook from './pages/faculty/GradeBook';
 import StudentDashboard from './pages/student/StudentDashboard';
+import StudentSubjects from './pages/student/StudentSubjects';
 import DeanDashboard from './pages/dean/DeanDashboard';
-import { LayoutDashboard, Users, Settings, ScrollText, BookOpen, ClipboardList, GraduationCap, BarChart3, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, ScrollText, BookOpen, ClipboardList, BarChart3 } from 'lucide-react';
 
 function ProtectedRoute({ children, roles }) {
   const { user } = useAuth();
@@ -35,7 +36,8 @@ const facultyNav = [
 ];
 
 const studentNav = [
-  { path: '/student', label: 'Dashboard & Grades', icon: <GraduationCap size={18} />, end: true },
+  { path: '/student', label: 'Dashboard', icon: <LayoutDashboard size={18} />, end: true },
+  { path: '/student/subjects', label: 'Subjects', icon: <BookOpen size={18} /> },
 ];
 
 const deanNav = [
@@ -65,6 +67,7 @@ function AppRoutes() {
 
       <Route path="/student" element={<ProtectedRoute roles={['student']}><DashboardLayout navItems={studentNav} /></ProtectedRoute>}>
         <Route index element={<StudentDashboard />} />
+        <Route path="subjects" element={<StudentSubjects />} />
       </Route>
 
       <Route path="/dean" element={<ProtectedRoute roles={['dean','program_chair']}><DashboardLayout navItems={deanNav} /></ProtectedRoute>}>
