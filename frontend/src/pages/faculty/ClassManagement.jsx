@@ -7,12 +7,53 @@ export default function ClassManagement() {
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ subject_id: '', section: '', academic_year: '2025-2026', semester: '2nd', schedule: '', room: '' });
+  const [form, setForm] = useState({ subject_id: '', section: '', academic_year: '2025-2026', semester: '1st', schedule: '', room: '' });
+  const [settings, setSettings] = useState({});
   const [toast, setToast] = useState(null);
   const navigate = useNavigate();
 
   const fetch = () => { api.get('/classes').then(r => setClasses(r.data.data || [])); };
-  useEffect(() => { fetch(); api.get('/subjects').then(r => setSubjects(r.data.data || [])); }, []);
+  
+  useEffect(() => { 
+    fetch(); 
+    api.get('/subjects').then(r => setSubjects(r.data.data || [])); 
+    api.get('/settings').then(r => {
+      const data = r.data.data || [];
+      const map = {};
+      data.forEach(s => map[s.setting_key] = s.setting_value);
+      setSettings(map);
+      setForm(prev => ({
+        ...prev,
+        academic_year: map.active_academic_year || prev.academic_year,
+        semester: map.active_semester || prev.semester
+      }));
+    }).catch(() => {});
+  }, []);
+
+  const openModal = () => {
+    setForm({
+      subject_id: '',
+      section: '',
+      academic_year: settings.active_academic_year || '2025-2026',
+      semester: settings.active_semester || '1st',
+      schedule: '',
+      room: ''
+    });
+    setShowModal(true);
+  };
+
+  const generateAcademicYears = () => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let i = currentYear - 5; i <= currentYear + 5; i++) {
+      years.push(`${i}-${i + 1}`);
+    }
+    if (settings.active_academic_year && !years.includes(settings.active_academic_year)) {
+      years.push(settings.active_academic_year);
+      years.sort();
+    }
+    return years.reverse();
+  };
 
   const showToast = (msg, type='success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
@@ -28,7 +69,7 @@ export default function ClassManagement() {
     <div className="animate-in">
       <div className="page-header flex-between">
         <div><h1>Class Records</h1><p>Create and manage your classes</p></div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}><Plus size={18} />New Class</button>
+        <button className="btn btn-primary" onClick={openModal}><Plus size={18} />New Class</button>
       </div>
 
       <div className="table-container">
@@ -65,7 +106,12 @@ export default function ClassManagement() {
                 <div className="input-group"><label htmlFor="cc-room">Room</label><input id="cc-room" className="input-field" value={form.room} onChange={e => setForm({...form, room: e.target.value})} /></div>
               </div>
               <div className="grid-2">
-                <div className="input-group"><label htmlFor="cc-ay">Academic Year *</label><input id="cc-ay" className="input-field" required value={form.academic_year} onChange={e => setForm({...form, academic_year: e.target.value})} /></div>
+                <div className="input-group">
+                  <label htmlFor="cc-ay">Academic Year *</label>
+                  <select id="cc-ay" className="input-field" required value={form.academic_year} onChange={e => setForm({...form, academic_year: e.target.value})}>
+                    {generateAcademicYears().map(ay => <option key={ay} value={ay}>{ay}</option>)}
+                  </select>
+                </div>
                 <div className="input-group"><label htmlFor="cc-sem">Semester *</label><select id="cc-sem" className="input-field" value={form.semester} onChange={e => setForm({...form, semester: e.target.value})}><option value="1st">1st</option><option value="2nd">2nd</option><option value="Summer">Summer</option></select></div>
               </div>
               <div className="input-group"><label htmlFor="cc-sched">Schedule</label><input id="cc-sched" className="input-field" value={form.schedule} onChange={e => setForm({...form, schedule: e.target.value})} placeholder="e.g., MWF 9:00-10:00 AM" /></div>

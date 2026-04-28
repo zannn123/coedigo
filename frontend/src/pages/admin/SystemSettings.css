@@ -1,0 +1,418 @@
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.settings-eyebrow {
+  color: var(--accent);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+}
+
+.settings-header h1 {
+  font-size: clamp(1.65rem, 3vw, 2.25rem);
+  line-height: 1.05;
+}
+
+.settings-save-button {
+  min-width: 112px;
+}
+
+.settings-shell {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.34fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.settings-nav {
+  position: sticky;
+  top: 5.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-lg) + 4px);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 46px;
+  padding: 0.65rem 0.75rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: left;
+  transition: background var(--transition), color var(--transition), transform var(--transition);
+}
+
+.settings-nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.settings-nav-item.is-active {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.settings-nav-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: inherit;
+}
+
+.settings-nav-item.is-active .settings-nav-icon {
+  background: var(--accent-muted);
+}
+
+.settings-panel {
+  min-height: 430px;
+  padding: 1.35rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-lg) + 4px);
+  background:
+    linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-surface) 64%, var(--bg-primary) 100%);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-title-block {
+  min-width: 0;
+}
+
+.settings-section-count {
+  display: inline-flex;
+  margin-bottom: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.settings-panel h2 {
+  font-size: 1.22rem;
+}
+
+.settings-status-pill,
+.settings-change-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 30px;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.settings-status-pill.is-good {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.settings-status-pill.is-warning,
+.settings-change-state.is-dirty {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.settings-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.95rem;
+}
+
+.settings-field-grid-email {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-field {
+  min-width: 0;
+}
+
+.settings-field label {
+  display: block;
+  margin-bottom: 0.42rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.settings-control-wrap {
+  position: relative;
+}
+
+.settings-input {
+  width: 100%;
+  min-height: 46px;
+  background: var(--bg-primary);
+  border-color: var(--border);
+  font-size: 0.94rem;
+}
+
+.settings-field.has-suffix .settings-input {
+  padding-right: 2.3rem;
+}
+
+.settings-suffix {
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.settings-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.settings-mobile-save {
+  display: none;
+}
+
+[data-theme='dark'] .settings-panel {
+  background:
+    linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-surface) 64%, var(--bg-secondary) 100%);
+}
+
+@media (max-width: 1024px) {
+  .settings-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-nav-item {
+    min-width: max-content;
+    width: auto;
+    padding-right: 0.95rem;
+  }
+
+  .settings-field-grid-email {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .settings-page {
+    gap: 0;
+    padding-bottom: 2rem;
+  }
+
+  .settings-header {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-surface);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    backdrop-filter: blur(12px);
+    margin-bottom: 0;
+  }
+
+  .settings-eyebrow {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.15rem;
+  }
+
+  .settings-header h1 {
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .settings-save-button {
+    display: none;
+  }
+
+  .settings-shell {
+    gap: 0;
+  }
+
+  .settings-nav {
+    display: flex;
+    gap: 0;
+    padding: 0 0.5rem;
+    background: var(--bg-primary);
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-nav-item {
+    flex: 1;
+    min-width: max-content;
+    height: 48px;
+    padding: 0 1rem;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  .settings-nav-item:active {
+    transform: scale(0.96);
+  }
+
+  .settings-nav-item.is-active {
+    background: transparent;
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .settings-nav-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 8px;
+    background: transparent;
+  }
+
+  .settings-nav-item.is-active .settings-nav-icon {
+    background: transparent;
+    color: var(--accent);
+  }
+
+  .settings-panel {
+    min-height: calc(100vh - 200px);
+    padding: 1rem;
+    border: none;
+    border-radius: 0;
+    background: var(--bg-primary);
+    box-shadow: none;
+  }
+
+  .settings-panel-head {
+    display: none;
+  }
+
+  .settings-status-pill {
+    margin-bottom: 0.75rem;
+  }
+
+  .settings-field-grid,
+  .settings-field-grid-email {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .settings-field {
+    padding: 0.85rem 1rem;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .settings-field:first-child {
+    border-top: 1px solid var(--border);
+  }
+
+  .settings-field label {
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .settings-input {
+    min-height: 44px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+
+  .settings-panel-footer {
+    position: sticky;
+    bottom: 0;
+    padding: 1rem;
+    margin: 1rem -1rem -1rem;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+
+  .settings-change-state {
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .settings-mobile-save {
+    display: inline-flex;
+    flex: 1;
+    height: 44px;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+}
+
+@media (max-width: 430px) {
+  .settings-status-pill {
+    display: none;
+  }
+}

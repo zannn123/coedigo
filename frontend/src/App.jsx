@@ -2,9 +2,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import DashboardLayout from './components/layout/DashboardLayout';
 import Login from './pages/auth/Login';
+import RequestAccount from './pages/auth/RequestAccount';
 import Developers from './pages/public/Developers';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
+import AccountRequests from './pages/admin/AccountRequests';
 import SystemSettings from './pages/admin/SystemSettings';
 import AuditLogs from './pages/admin/AuditLogs';
 import FacultyDashboard from './pages/faculty/FacultyDashboard';
@@ -15,7 +17,8 @@ import StudentDashboard from './pages/student/StudentDashboard';
 import StudentSubjects from './pages/student/StudentSubjects';
 import DeanDashboard from './pages/dean/DeanDashboard';
 import AccountSettings from './pages/shared/AccountSettings';
-import { LayoutDashboard, Users, Settings, ScrollText, BookOpen, ClipboardList, BarChart3 } from 'lucide-react';
+import ErrorLogs from './pages/admin/ErrorLogs';
+import { LayoutDashboard, Users, UserPlus, Settings, ScrollText, BookOpen, ClipboardList, BarChart3, AlertTriangle } from 'lucide-react';
 
 function ProtectedRoute({ children, roles }) {
   const { user } = useAuth();
@@ -27,8 +30,10 @@ function ProtectedRoute({ children, roles }) {
 const adminNav = [
   { path: '/admin', label: 'Dashboard', icon: <LayoutDashboard size={18} />, end: true },
   { path: '/admin/users', label: 'User Management', icon: <Users size={18} /> },
+  { path: '/admin/account-requests', label: 'Account Requests', icon: <UserPlus size={18} /> },
   { path: '/admin/settings', label: 'System Settings', icon: <Settings size={18} /> },
   { path: '/admin/audit-logs', label: 'Activity Logs', icon: <ScrollText size={18} /> },
+  { path: '/admin/error-logs', label: 'Error Logs', icon: <AlertTriangle size={18} /> },
 ];
 
 const facultyNav = [
@@ -52,13 +57,16 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : user.role === 'student' ? '/student' : '/dean'} replace /> : <Login />} />
+      <Route path="/request-account" element={<RequestAccount />} />
       <Route path="/developers" element={<Developers />} />
 
       <Route path="/admin" element={<ProtectedRoute roles={['admin']}><DashboardLayout navItems={adminNav} /></ProtectedRoute>}>
         <Route index element={<AdminDashboard />} />
         <Route path="users" element={<UserManagement />} />
+        <Route path="account-requests" element={<AccountRequests />} />
         <Route path="settings" element={<SystemSettings />} />
         <Route path="audit-logs" element={<AuditLogs />} />
+        <Route path="error-logs" element={<ErrorLogs />} />
         <Route path="account" element={<AccountSettings />} />
       </Route>
 

@@ -13,8 +13,23 @@ const requestTypeOptions = [
   { value: 'other', label: 'Other' },
 ];
 
+const accountSections = [
+  { id: 'profile', label: 'Profile', icon: UserRoundCog },
+  { id: 'security', label: 'Security', icon: LockKeyhole },
+  { id: 'requests', label: 'Requests', icon: Send },
+];
+
+const formatRole = role => (role ? role.replace(/_/g, ' ') : 'User');
+
+const getFullName = person => (
+  [person?.first_name, person?.middle_name, person?.last_name, person?.suffix]
+    .filter(Boolean)
+    .join(' ') || person?.email || 'Your account'
+);
+
 export default function AccountSettings() {
   const { user, refreshUser } = useAuth();
+  const [activeSection, setActiveSection] = useState('profile');
   const [profile, setProfile] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [passwordForm, setPasswordForm] = useState({
@@ -63,27 +78,30 @@ export default function AccountSettings() {
     showToast.timeoutId = window.setTimeout(() => setToast(null), duration);
   };
 
+  const displayProfile = profile || user || {};
+  const displayName = getFullName(displayProfile);
+  const roleLabel = formatRole(displayProfile.role);
+
   const profileRows = useMemo(() => ([
-    { label: 'Full name', value: profile ? [profile.first_name, profile.middle_name, profile.last_name, profile.suffix].filter(Boolean).join(' ') : '—' },
-    { label: 'Email', value: profile?.email || '—' },
-    { label: 'Role', value: profile?.role ? profile.role.replace('_', ' ') : '—' },
-    { label: 'Program', value: profile?.program || '—' },
-    { label: 'Student ID', value: profile?.student_id || '—' },
-    { label: 'Employee ID', value: profile?.employee_id || '—' },
+    { label: 'Name', value: getFullName(profile) },
+    { label: 'Email', value: profile?.email || '-' },
+    { label: 'Role', value: formatRole(profile?.role) },
+    { label: 'Program', value: profile?.program || '-' },
+    { label: 'Student ID', value: profile?.student_id || '-' },
+    { label: 'Employee ID', value: profile?.employee_id || '-' },
+    { label: 'Contact', value: profile?.contact_number || '-' },
   ]), [profile]);
 
-  const summaryRows = useMemo(() => ([
-    { label: 'Email address', value: profile?.email || '—', icon: Mail },
-    { label: 'Contact number', value: profile?.contact_number || '—', icon: Phone },
-    { label: 'Program', value: profile?.program || '—', icon: ShieldCheck },
-    { label: 'Student / Employee ID', value: profile?.student_id || profile?.employee_id || '—', icon: UserRoundCog },
-  ]), [profile]);
+  const quickContacts = useMemo(() => ([
+    { label: 'Email', value: displayProfile.email || '-', icon: Mail },
+    { label: 'Contact', value: displayProfile.contact_number || '-', icon: Phone },
+  ]), [displayProfile.email, displayProfile.contact_number]);
 
   const userInitials = useMemo(() => {
-    const first = profile?.first_name?.[0] || user?.first_name?.[0] || '';
-    const last = profile?.last_name?.[0] || user?.last_name?.[0] || '';
+    const first = displayProfile.first_name?.[0] || '';
+    const last = displayProfile.last_name?.[0] || '';
     return `${first}${last}`.toUpperCase() || 'CO';
-  }, [profile, user]);
+  }, [displayProfile.first_name, displayProfile.last_name]);
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
@@ -140,187 +158,168 @@ export default function AccountSettings() {
 
   return (
     <div className="account-settings-page animate-in">
-      <div className="page-header account-page-header">
-        <h1>Account Settings</h1>
-        <p>Change your password yourself, and send admin requests only for email, contact, or record corrections that you cannot edit directly.</p>
-      </div>
-
-      <div className="account-settings-layout">
-        <aside className="account-summary-column">
-          <section className="card account-identity-card">
-            <div className="account-identity-top">
-              <div className="account-avatar">{userInitials}</div>
-              <div className="account-identity-copy">
-                <span className="account-chip">Active account</span>
-                <h2>{profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') : 'Your account'}</h2>
-                <p>{profile?.role ? profile.role.replace('_', ' ') : 'User'} access for the College of Engineering portal.</p>
-              </div>
-            </div>
-
-            <div className="account-summary-stack">
-              {summaryRows.map(item => {
-                const Icon = item.icon;
-                return (
-                  <div key={item.label} className="account-summary-item">
-                    <span className="account-summary-icon" aria-hidden="true">
-                      <Icon size={15} />
-                    </span>
-                    <div>
-                      <small>{item.label}</small>
-                      <strong>{item.value}</strong>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="account-side-note">
-              <strong>Use admin requests only for locked fields.</strong>
-              <p>Email, contact number, and academic record corrections can be reviewed by admin when needed. Password updates stay self-service.</p>
-            </div>
-          </section>
-
-          <div className="account-section-head">
-            <div className="account-section-icon">
-              <ShieldCheck size={18} />
-            </div>
-            <div>
-              <h2>Profile Snapshot</h2>
-              <p>Reference your current account details before requesting corrections.</p>
-            </div>
+      <header className="account-settings-header">
+        <div className="account-settings-identity">
+          <div className="account-avatar">{userInitials}</div>
+          <div>
+            <span className="account-kicker">{roleLabel}</span>
+            <h1>Settings</h1>
+            <p>{displayName}</p>
           </div>
+        </div>
 
-          {loadingProfile ? (
-            <p className="account-muted-copy">Loading account details...</p>
-          ) : (
-            <div className="account-profile-grid">
-              {profileRows.map(item => (
-                <div key={item.label} className="account-profile-row">
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                </div>
-              ))}
-            </div>
-          )}
-        </aside>
+        <div className="account-status-group" aria-label="Account status">
+          <span className="account-status-pill">
+            <ShieldCheck size={15} />
+            Active
+          </span>
+        </div>
+      </header>
 
-        <div className="account-main-column">
-          <section className="card account-overview-card">
-            <div className="account-overview-copy">
-              <span className="account-chip">Quick guide</span>
-              <h2>Keep the essentials in one place</h2>
-              <p>Use the left side for reference, update your password in the secure form, and send admin requests only when a record field needs manual correction.</p>
-            </div>
+      <div className="account-settings-shell">
+        <nav className="account-settings-nav" aria-label="Account settings sections">
+          {accountSections.map(section => {
+            const Icon = section.icon;
+            const isActive = activeSection === section.id;
 
-            <div className="account-overview-grid">
-              <div>
-                <strong>Self-service</strong>
-                <span>Password updates happen here directly.</span>
-              </div>
-              <div>
-                <strong>Admin review</strong>
-                <span>Email, contact, and record corrections can be requested with notes.</span>
-              </div>
-              <div>
-                <strong>Profile reference</strong>
-                <span>Use your current data snapshot to avoid submitting incorrect requests.</span>
-              </div>
-            </div>
-          </section>
-
-          <section className="card account-action-card">
-            <div className="account-section-head">
-              <div className="account-section-icon">
-                <LockKeyhole size={18} />
-              </div>
-              <div>
-                <h2>Change Password</h2>
-                <p>Password changes are self-service. Use your current password, then set a new one with at least 8 characters.</p>
-              </div>
-            </div>
-
-            <div className="account-hint-row">
-              <span className="account-inline-pill">No admin approval needed</span>
-              <span className="account-inline-pill">Minimum 8 characters</span>
-              <span className="account-inline-pill">Use your current password first</span>
-            </div>
-
-            <form className="account-form" onSubmit={handlePasswordSubmit}>
-              <div className="input-group">
-                <label htmlFor="current-password">Current password</label>
-                <input
-                  id="current-password"
-                  type="password"
-                  className="input-field"
-                  value={passwordForm.current_password}
-                  onChange={event => setPasswordForm(prev => ({ ...prev, current_password: event.target.value }))}
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
-
-              <div className="grid-2">
-                <div className="input-group">
-                  <label htmlFor="new-password">New password</label>
-                  <input
-                    id="new-password"
-                    type="password"
-                    className="input-field"
-                    value={passwordForm.new_password}
-                    onChange={event => setPasswordForm(prev => ({ ...prev, new_password: event.target.value }))}
-                    autoComplete="new-password"
-                    minLength={8}
-                    required
-                  />
-                </div>
-
-                <div className="input-group">
-                  <label htmlFor="confirm-password">Confirm new password</label>
-                  <input
-                    id="confirm-password"
-                    type="password"
-                    className="input-field"
-                    value={passwordForm.confirm_password}
-                    onChange={event => setPasswordForm(prev => ({ ...prev, confirm_password: event.target.value }))}
-                    autoComplete="new-password"
-                    minLength={8}
-                    required
-                  />
-                </div>
-              </div>
-
-              <button type="submit" className="btn btn-primary">
-                <LockKeyhole size={16} />
-                {passwordBusy ? 'Updating password...' : 'Update password'}
+            return (
+              <button
+                key={section.id}
+                type="button"
+                className={`account-settings-nav-item${isActive ? ' is-active' : ''}`}
+                onClick={() => setActiveSection(section.id)}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <span className="account-settings-nav-icon" aria-hidden="true">
+                  <Icon size={18} />
+                </span>
+                <span>{section.label}</span>
               </button>
-            </form>
-          </section>
+            );
+          })}
+        </nav>
 
-          <section className="card account-action-card account-request-card">
-            <div className="account-section-head">
-              <div className="account-section-icon">
-                <UserRoundCog size={18} />
-              </div>
-              <div>
-                <h2>Request Admin Record Update</h2>
-                <p>Use this only when your email, contact number, or academic record details need administrator review. Password changes do not need admin approval.</p>
-              </div>
-            </div>
-
-            <div className="account-request-shell">
-              <div className="account-request-guide">
-                <strong>Good reasons to use this request</strong>
-                <ul>
-                  <li>Your institutional email needs correction</li>
-                  <li>Your contact number in the system is outdated</li>
-                  <li>Your student or employee record details are incorrect</li>
-                </ul>
+        <main className="account-settings-panel">
+          {activeSection === 'profile' && (
+            <section aria-labelledby="account-profile-heading">
+              <div className="account-panel-head">
+                <div>
+                  <span className="account-section-count">01</span>
+                  <h2 id="account-profile-heading">Profile</h2>
+                </div>
               </div>
 
-              <form className="account-form" onSubmit={handleRequestSubmit}>
-                <div className="grid-2">
+              {loadingProfile ? (
+                <p className="account-muted-copy">Loading account details...</p>
+              ) : (
+                <>
+                  <div className="account-contact-strip">
+                    {quickContacts.map(item => {
+                      const Icon = item.icon;
+
+                      return (
+                        <div key={item.label} className="account-contact-card">
+                          <span aria-hidden="true">
+                            <Icon size={16} />
+                          </span>
+                          <div>
+                            <small>{item.label}</small>
+                            <strong>{item.value}</strong>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="account-profile-grid">
+                    {profileRows.map(item => (
+                      <div key={item.label} className="account-profile-row">
+                        <span>{item.label}</span>
+                        <strong>{item.value}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+
+          {activeSection === 'security' && (
+            <section aria-labelledby="account-security-heading">
+              <div className="account-panel-head">
+                <div>
+                  <span className="account-section-count">02</span>
+                  <h2 id="account-security-heading">Security</h2>
+                </div>
+              </div>
+
+              <form className="account-settings-form" onSubmit={handlePasswordSubmit}>
+                <div className="input-group">
+                  <label htmlFor="current-password">Current password</label>
+                  <input
+                    id="current-password"
+                    type="password"
+                    className="input-field"
+                    value={passwordForm.current_password}
+                    onChange={event => setPasswordForm(prev => ({ ...prev, current_password: event.target.value }))}
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
+
+                <div className="account-field-grid">
                   <div className="input-group">
-                    <label htmlFor="request-type">Request category</label>
+                    <label htmlFor="new-password">New password</label>
+                    <input
+                      id="new-password"
+                      type="password"
+                      className="input-field"
+                      value={passwordForm.new_password}
+                      onChange={event => setPasswordForm(prev => ({ ...prev, new_password: event.target.value }))}
+                      autoComplete="new-password"
+                      minLength={8}
+                      required
+                    />
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="confirm-password">Confirm password</label>
+                    <input
+                      id="confirm-password"
+                      type="password"
+                      className="input-field"
+                      value={passwordForm.confirm_password}
+                      onChange={event => setPasswordForm(prev => ({ ...prev, confirm_password: event.target.value }))}
+                      autoComplete="new-password"
+                      minLength={8}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="account-panel-footer">
+                  <button type="submit" className="btn btn-primary">
+                    <LockKeyhole size={16} />
+                    {passwordBusy ? 'Saving...' : 'Save password'}
+                  </button>
+                </div>
+              </form>
+            </section>
+          )}
+
+          {activeSection === 'requests' && (
+            <section aria-labelledby="account-requests-heading">
+              <div className="account-panel-head">
+                <div>
+                  <span className="account-section-count">03</span>
+                  <h2 id="account-requests-heading">Requests</h2>
+                </div>
+              </div>
+
+              <form className="account-settings-form" onSubmit={handleRequestSubmit}>
+                <div className="account-field-grid">
+                  <div className="input-group">
+                    <label htmlFor="request-type">Category</label>
                     <select
                       id="request-type"
                       className="input-field"
@@ -334,7 +333,7 @@ export default function AccountSettings() {
                   </div>
 
                   <div className="input-group">
-                    <label htmlFor="requested-email">Requested email</label>
+                    <label htmlFor="requested-email">New email</label>
                     <input
                       id="requested-email"
                       type="email"
@@ -342,13 +341,13 @@ export default function AccountSettings() {
                       value={requestForm.requested_email}
                       onChange={event => setRequestForm(prev => ({ ...prev, requested_email: event.target.value }))}
                       autoComplete="email"
-                      placeholder="Only fill this if you want your email updated"
+                      placeholder="name@example.com"
                     />
                   </div>
                 </div>
 
                 <div className="input-group">
-                  <label htmlFor="requested-contact">Requested contact number</label>
+                  <label htmlFor="requested-contact">New contact number</label>
                   <input
                     id="requested-contact"
                     type="tel"
@@ -356,31 +355,33 @@ export default function AccountSettings() {
                     value={requestForm.requested_contact_number}
                     onChange={event => setRequestForm(prev => ({ ...prev, requested_contact_number: event.target.value }))}
                     autoComplete="tel"
-                    placeholder="Optional new contact number"
+                    placeholder="09xx xxx xxxx"
                   />
                 </div>
 
                 <div className="input-group">
-                  <label htmlFor="request-note">Note to admin</label>
+                  <label htmlFor="request-note">Note</label>
                   <textarea
                     id="request-note"
                     className="input-field account-textarea"
                     value={requestForm.note}
                     onChange={event => setRequestForm(prev => ({ ...prev, note: event.target.value }))}
-                    placeholder="Explain what should be corrected and include enough detail for the admin to verify your request."
+                    placeholder="What should be corrected?"
                     minLength={10}
                     required
                   />
                 </div>
 
-                <button type="submit" className="btn btn-primary">
-                  <Send size={16} />
-                  {requestBusy ? 'Sending request...' : 'Send request to admin'}
-                </button>
+                <div className="account-panel-footer">
+                  <button type="submit" className="btn btn-primary">
+                    <Send size={16} />
+                    {requestBusy ? 'Sending...' : 'Send request'}
+                  </button>
+                </div>
               </form>
-            </div>
-          </section>
-        </div>
+            </section>
+          )}
+        </main>
       </div>
 
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}

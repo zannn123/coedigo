@@ -1,113 +1,272 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { BookOpen, CheckCircle, Mail, Save, Settings, Shield } from 'lucide-react';
 import api from '../../services/api';
-import { Shield, Save } from 'lucide-react';
+import './SystemSettings.css';
+
+const DEFAULT_SETTINGS = {
+  institution_name: '',
+  college_name: '',
+  current_academic_year: '',
+  current_semester: '1st',
+  major_exam_weight: '',
+  quiz_weight: '',
+  project_weight: '',
+  passing_grade: '',
+  smtp_host: 'smtp.gmail.com',
+  smtp_port: '465',
+  smtp_username: '',
+  smtp_password: '',
+  smtp_encryption: 'ssl',
+  mail_from_address: '',
+  mail_from_name: 'COEDIGO',
+  mail_reply_to: '',
+};
+
+const SECTIONS = [
+  {
+    id: 'institution',
+    title: 'Institution',
+    icon: Shield,
+    fields: [
+      { key: 'institution_name', label: 'Institution' },
+      { key: 'college_name', label: 'College' },
+    ],
+  },
+  {
+    id: 'term',
+    title: 'Academic Term',
+    icon: BookOpen,
+    fields: [
+      { key: 'current_academic_year', label: 'Academic Year', placeholder: '2025-2026' },
+      {
+        key: 'current_semester',
+        label: 'Semester',
+        type: 'select',
+        options: [
+          { value: '1st', label: '1st Semester' },
+          { value: '2nd', label: '2nd Semester' },
+          { value: 'Summer', label: 'Summer' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'grading',
+    title: 'Grading',
+    icon: Settings,
+    fields: [
+      { key: 'major_exam_weight', label: 'Exams', type: 'number', min: 0, max: 100, suffix: '%' },
+      { key: 'quiz_weight', label: 'Quizzes', type: 'number', min: 0, max: 100, suffix: '%' },
+      { key: 'project_weight', label: 'Projects', type: 'number', min: 0, max: 100, suffix: '%' },
+      { key: 'passing_grade', label: 'Passing Grade', placeholder: '3.00' },
+    ],
+  },
+  {
+    id: 'email',
+    title: 'Email',
+    icon: Mail,
+    fields: [
+      { key: 'smtp_host', label: 'Host', placeholder: 'smtp.gmail.com' },
+      { key: 'smtp_port', label: 'Port', type: 'number', placeholder: '465' },
+      {
+        key: 'smtp_encryption',
+        label: 'Encryption',
+        type: 'select',
+        options: [
+          { value: 'ssl', label: 'SSL' },
+          { value: 'tls', label: 'TLS / STARTTLS' },
+          { value: 'none', label: 'None' },
+        ],
+      },
+      { key: 'smtp_username', label: 'Username', type: 'email', placeholder: 'name@gmail.com' },
+      { key: 'smtp_password', label: 'Password', type: 'password' },
+      { key: 'mail_from_name', label: 'From Name' },
+      { key: 'mail_from_address', label: 'From Email', type: 'email', placeholder: 'Optional' },
+      { key: 'mail_reply_to', label: 'Reply-To', type: 'email', placeholder: 'Optional' },
+    ],
+  },
+];
+
+function buildSettingsMap(rows) {
+  const map = {};
+  rows?.forEach(setting => {
+    map[setting.setting_key] = setting.setting_value;
+  });
+  return map;
+}
+
+function settingValue(settings, key) {
+  return settings[key] ?? '';
+}
 
 export default function SystemSettings() {
-  const defaultSettings = {
-    institution_name: '',
-    college_name: '',
-    current_academic_year: '',
-    current_semester: '1st',
-    major_exam_weight: '',
-    quiz_weight: '',
-    project_weight: '',
-    passing_grade: '',
-    smtp_host: 'smtp.gmail.com',
-    smtp_port: '465',
-    smtp_username: '',
-    smtp_password: '',
-    smtp_encryption: 'ssl',
-    mail_from_address: '',
-    mail_from_name: 'COEDIGO',
-    mail_reply_to: '',
-  };
-
-  const [settings, setSettings] = useState(defaultSettings);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [savedSettings, setSavedSettings] = useState(DEFAULT_SETTINGS);
+  const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    api.get('/settings').then(r => {
-      const map = {};
-      r.data.data?.forEach(s => { map[s.setting_key] = s.setting_value; });
-      setSettings(prev => ({ ...prev, ...map }));
-    }).catch(() => {});
+    let mounted = true;
+
+    api.get('/settings')
+      .then(response => {
+        if (!mounted) return;
+        const next = { ...DEFAULT_SETTINGS, ...buildSettingsMap(response.data.data) };
+        setSettings(next);
+        setSavedSettings(next);
+      })
+      .catch(() => {
+        if (mounted) setToast({ msg: 'Unable to load settings.', type: 'error' });
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => { mounted = false; };
   }, []);
 
-  const handleSave = async () => {
-    try {
-      await api.put('/settings', settings);
-      setToast({ msg: 'Settings saved successfully.', type: 'success' });
-      setTimeout(() => setToast(null), 3000);
-    } catch { setToast({ msg: 'Failed to save.', type: 'error' }); setTimeout(() => setToast(null), 3000); }
+  const activeConfig = SECTIONS.find(section => section.id === activeSection) || SECTIONS[0];
+  const activeSectionIndex = SECTIONS.findIndex(section => section.id === activeConfig.id) + 1;
+  const hasChanges = JSON.stringify(settings) !== JSON.stringify(savedSettings);
+
+  const gradingTotal = useMemo(() => {
+    return ['major_exam_weight', 'quiz_weight', 'project_weight'].reduce((total, key) => {
+      const value = Number(settings[key]);
+      return total + (Number.isFinite(value) ? value : 0);
+    }, 0);
+  }, [settings]);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ msg: message, type });
+    setTimeout(() => setToast(null), 2600);
   };
 
-  const update = (key, val) => setSettings(prev => ({ ...prev, [key]: val }));
+  const update = (key, value) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.put('/settings', settings);
+      setSavedSettings(settings);
+      showToast('Settings saved.');
+    } catch {
+      showToast('Save failed.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderControl = field => {
+    const id = `setting-${field.key}`;
+    const commonProps = {
+      id,
+      className: 'input-field settings-input',
+      value: settingValue(settings, field.key),
+      onChange: event => update(field.key, event.target.value),
+    };
+
+    if (field.type === 'select') {
+      return (
+        <select {...commonProps}>
+          {field.options.map(option => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      );
+    }
+
+    return (
+      <input
+        {...commonProps}
+        type={field.type || 'text'}
+        min={field.min}
+        max={field.max}
+        placeholder={field.placeholder || ''}
+      />
+    );
+  };
 
   return (
-    <div className="animate-in">
-      <div className="page-header flex-between">
-        <div><h1>System Settings</h1><p>Configure grading parameters and institution details</p></div>
-        <button className="btn btn-primary" onClick={handleSave}><Save size={18} />Save Changes</button>
-      </div>
+    <div className="settings-page animate-in">
+      <header className="settings-header">
+        <div>
+          <p className="settings-eyebrow">Admin</p>
+          <h1>Settings</h1>
+        </div>
+        <button className="btn btn-primary settings-save-button" onClick={handleSave} disabled={saving || loading || !hasChanges}>
+          <Save size={18} />
+          {saving ? 'Saving' : hasChanges ? 'Save' : 'Saved'}
+        </button>
+      </header>
 
-      <div className="grid-2">
-        <div className="card">
-          <h3 style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Shield size={18} /> Institution</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="input-group"><label>Institution Name</label><input className="input-field" value={settings.institution_name || ''} onChange={e => update('institution_name', e.target.value)} /></div>
-            <div className="input-group"><label>College Name</label><input className="input-field" value={settings.college_name || ''} onChange={e => update('college_name', e.target.value)} /></div>
-            <div className="grid-2">
-              <div className="input-group"><label>Academic Year</label><input className="input-field" value={settings.current_academic_year || ''} onChange={e => update('current_academic_year', e.target.value)} /></div>
-              <div className="input-group"><label>Semester</label><select className="input-field" value={settings.current_semester || ''} onChange={e => update('current_semester', e.target.value)}><option value="1st">1st</option><option value="2nd">2nd</option><option value="Summer">Summer</option></select></div>
+      <div className="settings-shell">
+        <nav className="settings-nav" aria-label="Settings sections">
+          {SECTIONS.map(section => {
+            const Icon = section.icon;
+            const isActive = section.id === activeConfig.id;
+
+            return (
+              <button
+                key={section.id}
+                type="button"
+                className={`settings-nav-item ${isActive ? 'is-active' : ''}`}
+                onClick={() => setActiveSection(section.id)}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <span className="settings-nav-icon"><Icon size={18} /></span>
+                <span>{section.title}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <section className="settings-panel" aria-labelledby={`settings-${activeConfig.id}-title`}>
+          <div className="settings-panel-head">
+            <div className="settings-title-block">
+              <span className="settings-section-count">{activeSectionIndex}/{SECTIONS.length}</span>
+              <h2 id={`settings-${activeConfig.id}-title`}>{activeConfig.title}</h2>
             </div>
-          </div>
-        </div>
 
-        <div className="card">
-          <h3 style={{ marginBottom: '1.25rem' }}>Grading Weights</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="input-group"><label>Major Exams (%)</label><input type="number" className="input-field" min="0" max="100" value={settings.major_exam_weight || ''} onChange={e => update('major_exam_weight', e.target.value)} /></div>
-            <div className="input-group"><label>Quizzes (%)</label><input type="number" className="input-field" min="0" max="100" value={settings.quiz_weight || ''} onChange={e => update('quiz_weight', e.target.value)} /></div>
-            <div className="input-group"><label>Projects/Outputs (%)</label><input type="number" className="input-field" min="0" max="100" value={settings.project_weight || ''} onChange={e => update('project_weight', e.target.value)} /></div>
-            <div className="input-group"><label>Passing Grade</label><input className="input-field" value={settings.passing_grade || ''} onChange={e => update('passing_grade', e.target.value)} /></div>
-          </div>
-        </div>
-      </div>
+            {activeConfig.id === 'grading' && (
+              <span className={`settings-status-pill ${gradingTotal === 100 ? 'is-good' : 'is-warning'}`}>
+                {gradingTotal}% total
+              </span>
+            )}
 
-      <div className="card" style={{ marginTop: '1rem' }}>
-        <h3 style={{ marginBottom: '1.25rem' }}>Email Delivery</h3>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem' }}>
-          Use Gmail SMTP with an app password so new accounts receive their temporary password automatically.
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div className="grid-2">
-            <div className="input-group"><label>SMTP Host</label><input className="input-field" value={settings.smtp_host || ''} onChange={e => update('smtp_host', e.target.value)} placeholder="smtp.gmail.com" /></div>
-            <div className="input-group"><label>SMTP Port</label><input type="number" className="input-field" value={settings.smtp_port || ''} onChange={e => update('smtp_port', e.target.value)} placeholder="465" /></div>
+            {activeConfig.id === 'email' && (
+              <span className="settings-status-pill">
+                <Mail size={14} /> SMTP
+              </span>
+            )}
           </div>
-          <div className="grid-2">
-            <div className="input-group">
-              <label>Encryption</label>
-              <select className="input-field" value={settings.smtp_encryption || 'ssl'} onChange={e => update('smtp_encryption', e.target.value)}>
-                <option value="ssl">SSL</option>
-                <option value="tls">TLS / STARTTLS</option>
-                <option value="none">None</option>
-              </select>
-            </div>
-            <div className="input-group"><label>Gmail Address / SMTP Username</label><input type="email" className="input-field" value={settings.smtp_username || ''} onChange={e => update('smtp_username', e.target.value)} placeholder="youraccount@gmail.com" /></div>
+
+          <div className={`settings-field-grid settings-field-grid-${activeConfig.id}`}>
+            {activeConfig.fields.map(field => (
+              <div key={field.key} className={`settings-field ${field.suffix ? 'has-suffix' : ''}`}>
+                <label htmlFor={`setting-${field.key}`}>{field.label}</label>
+                <div className="settings-control-wrap">
+                  {renderControl(field)}
+                  {field.suffix && <span className="settings-suffix">{field.suffix}</span>}
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="input-group">
-            <label>App Password / SMTP Password</label>
-            <input type="password" className="input-field" value={settings.smtp_password || ''} onChange={e => update('smtp_password', e.target.value)} placeholder="16-character app password" />
+
+          <div className="settings-panel-footer">
+            <span className={`settings-change-state ${hasChanges ? 'is-dirty' : ''}`}>
+              <CheckCircle size={15} />
+              {hasChanges ? 'Unsaved changes' : 'Up to date'}
+            </span>
+            <button className="btn btn-primary settings-mobile-save" onClick={handleSave} disabled={saving || loading || !hasChanges}>
+              <Save size={17} />
+              {saving ? 'Saving' : 'Save'}
+            </button>
           </div>
-          <div className="grid-2">
-            <div className="input-group"><label>From Name</label><input className="input-field" value={settings.mail_from_name || ''} onChange={e => update('mail_from_name', e.target.value)} /></div>
-            <div className="input-group"><label>From Email</label><input type="email" className="input-field" value={settings.mail_from_address || ''} onChange={e => update('mail_from_address', e.target.value)} placeholder="leave blank to use Gmail address" /></div>
-          </div>
-          <div className="input-group">
-            <label>Reply-To Email</label>
-            <input type="email" className="input-field" value={settings.mail_reply_to || ''} onChange={e => update('mail_reply_to', e.target.value)} placeholder="optional support address" />
-          </div>
-        </div>
+        </section>
       </div>
 
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}

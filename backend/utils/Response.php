@@ -5,6 +5,10 @@
 
 class Response {
     public static function json($data, $statusCode = 200) {
+        // Discard any buffered PHP warnings/notices that would corrupt JSON output
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         http_response_code($statusCode);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode($data, JSON_UNESCAPED_UNICODE);

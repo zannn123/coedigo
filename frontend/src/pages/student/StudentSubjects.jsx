@@ -5,6 +5,7 @@ import { BookOpen, CalendarDays, ChevronDown, Percent, UserCheck } from 'lucide-
 export default function StudentSubjects() {
   const [grades, setGrades] = useState([]);
   const [expandedSubject, setExpandedSubject] = useState(null);
+  const [activeYear, setActiveYear] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -33,7 +34,7 @@ export default function StudentSubjects() {
     faculty_verified: 'badge-info',
     draft: 'badge-warning',
   };
-  const categoryLabels = { major_exam: 'Major Exam', quiz: 'Quiz', project: 'Project / Attendance' };
+  const categoryLabels = { major_exam: 'Major Exam', quiz: 'Quiz', project: 'Performance Tasks / Attendance' };
 
   const numberValue = value => {
     const parsed = parseFloat(value);
@@ -152,6 +153,70 @@ export default function StudentSubjects() {
       });
   }, [grades]);
 
+  useEffect(() => {
+    if (academicYears.length > 0 && (!activeYear || !academicYears.find(y => y.year === activeYear))) {
+      setActiveYear(academicYears[0].year);
+    }
+  }, [academicYears, activeYear]);
+  const renderComponentSection = (components, title) => {
+    if (!components.length) return null;
+    return (
+      <div className="detail-section" style={{ marginBottom: '1.5rem' }}>
+        <h3 style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Percent size={16} />{title}</h3>
+        <div className="table-container compact-table component-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Component</th>
+                <th>Score</th>
+                <th>Max</th>
+                <th>Percent</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {components.map(component => {
+                const percent = componentPercent(component);
+                const cleanName = component.component_name.replace(/\[(Midterm|Final)\]\s*/i, '').trim();
+                return (
+                  <tr key={component.id}>
+                    <td><span className="badge badge-accent">{categoryLabels[component.category] || component.category}</span></td>
+                    <td style={{ fontWeight: 600 }}>{cleanName}</td>
+                    <td>{component.score ?? '-'}</td>
+                    <td>{component.max_score}</td>
+                    <td>{percent != null ? `${percent}%` : '-'}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{formatDateTime(component.updated_at || component.encoded_at)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="component-mobile-list">
+          {components.map(component => {
+            const percent = componentPercent(component);
+            const cleanName = component.component_name.replace(/\[(Midterm|Final)\]\s*/i, '').trim();
+            return (
+              <div key={component.id} className="component-result-card">
+                <div className="component-result-top">
+                  <span className="badge badge-accent">{categoryLabels[component.category] || component.category}</span>
+                  <strong>{cleanName}</strong>
+                </div>
+                <div className="component-score-grid">
+                  <div><span>Score</span><strong>{component.score ?? '-'}</strong></div>
+                  <div><span>Max</span><strong>{component.max_score}</strong></div>
+                  <div><span>Percent</span><strong>{percent != null ? `${percent}%` : '-'}</strong></div>
+                </div>
+                <p>Updated {formatDateTime(component.updated_at || component.encoded_at)}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="animate-in student-subjects-page">
       <div className="page-header">
@@ -164,7 +229,7 @@ export default function StudentSubjects() {
           <span><BookOpen size={16} /> Academic Records</span>
           <h2>{grades.length} Enrolled Subject{grades.length === 1 ? '' : 's'}</h2>
           <p style={{ margin: '0.5rem 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-            Component scores refresh automatically. Final marks appear only after faculty verification.
+            Scores refresh automatically. Final marks require faculty verification.
           </p>
         </div>
         <div className="subjects-overview-metrics">
@@ -183,30 +248,37 @@ export default function StudentSubjects() {
         <div className="card empty-state">No subjects available yet</div>
       ) : (
         <div className="academic-year-stack">
-          {academicYears.map(yearGroup => (
-            <section key={yearGroup.year} className="academic-year-section">
-              <div className="academic-year-header">
+          <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>
+            {academicYears.map(yearGroup => (
+              <button
+                key={yearGroup.year}
+                className={`btn btn-sm ${activeYear === yearGroup.year ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ whiteSpace: 'nowrap', fontWeight: 600, border: activeYear !== yearGroup.year ? '1px solid var(--border)' : 'none', padding: '0.5rem 1rem' }}
+                onClick={() => setActiveYear(yearGroup.year)}
+              >
+                A.Y. {yearGroup.year}
+              </button>
+            ))}
+          </div>
+
+          {academicYears.filter(yg => yg.year === activeYear).map(yearGroup => (
+            <section key={yearGroup.year} className="academic-year-section" style={{ border: 'none', padding: 0, background: 'transparent' }}>
+              <div className="year-summary" style={{ marginBottom: '2rem', padding: '1rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 <div>
-                  <span>Academic Year</span>
-                  <h2>{yearGroup.year}</h2>
+                  <strong>{yearGroup.stats.subjectCount}</strong>
+                  <span>Subjects</span>
                 </div>
-                <div className="year-summary">
-                  <div>
-                    <strong>{yearGroup.stats.subjectCount}</strong>
-                    <span>Subjects</span>
-                  </div>
-                  <div>
-                    <strong>{yearGroup.stats.releasedCount}</strong>
-                    <span>With Grades</span>
-                  </div>
-                  <div>
-                    <strong>{yearGroup.stats.averageGrade != null ? yearGroup.stats.averageGrade.toFixed(2) : '-'}</strong>
-                    <span>Avg Grade</span>
-                  </div>
-                  <div>
-                    <strong>{formatPoints(yearGroup.stats.presentPoints)}/{formatPoints(yearGroup.stats.possiblePoints)}</strong>
-                    <span>Attendance Pts</span>
-                  </div>
+                <div>
+                  <strong>{yearGroup.stats.releasedCount}</strong>
+                  <span>With Grades</span>
+                </div>
+                <div>
+                  <strong>{yearGroup.stats.averageGrade != null ? yearGroup.stats.averageGrade.toFixed(2) : '-'}</strong>
+                  <span>Avg Grade</span>
+                </div>
+                <div>
+                  <strong>{formatPoints(yearGroup.stats.presentPoints)}/{formatPoints(yearGroup.stats.possiblePoints)}</strong>
+                  <span>Attendance Pts</span>
                 </div>
               </div>
 
@@ -223,7 +295,7 @@ export default function StudentSubjects() {
                     <div className="subject-card-list">
                       {termGroup.subjects.map(subject => {
                         const key = getSubjectKey(subject);
-                        const isOpen = expandedSubject === key;
+                        const isOpen = expandedSubject?.key === key;
                         const canViewFinalGrade = subject.can_view_final_grade ?? subject.grade_status !== 'draft';
                         const attendanceTotal = numberValue(subject.attendance_summary?.total_points);
                         const attendancePossible = numberValue(subject.attendance_summary?.possible_points);
@@ -266,123 +338,71 @@ export default function StudentSubjects() {
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm subject-toggle"
-                              onClick={() => setExpandedSubject(isOpen ? null : key)}
-                              aria-expanded={isOpen}
-                              aria-controls={detailId(key)}
-                            >
-                              <span>{isOpen ? 'Hide Details' : 'View Details'}</span>
-                              <ChevronDown size={16} className={isOpen ? 'is-open' : ''} />
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                              <button
+                                type="button"
+                                className={`btn btn-sm ${isOpen && expandedSubject.tab === 'scores' ? 'btn-primary' : 'btn-ghost'} subject-toggle`}
+                                onClick={() => setExpandedSubject(isOpen && expandedSubject.tab === 'scores' ? null : { key, tab: 'scores' })}
+                                style={{ flex: 1, border: '1px solid var(--border)' }}
+                              >
+                                <Percent size={16} /> {isOpen && expandedSubject.tab === 'scores' ? 'Hide Scores' : 'View Scores'}
+                              </button>
+                              <button
+                                type="button"
+                                className={`btn btn-sm ${isOpen && expandedSubject.tab === 'attendance' ? 'btn-primary' : 'btn-ghost'} subject-toggle`}
+                                onClick={() => setExpandedSubject(isOpen && expandedSubject.tab === 'attendance' ? null : { key, tab: 'attendance' })}
+                                style={{ flex: 1, border: '1px solid var(--border)' }}
+                              >
+                                <UserCheck size={16} /> {isOpen && expandedSubject.tab === 'attendance' ? 'Hide Attendance' : 'View Attendance'}
+                              </button>
+                            </div>
 
                             {isOpen && (
                               <div className="subject-detail-panel" id={detailId(key)}>
-                                {!canViewFinalGrade && (
-                                  <div style={{ marginBottom:'1rem', padding:'0.875rem 1rem', border:'1px solid var(--border)', borderRadius:'var(--radius-md)', background:'var(--bg-surface)', color:'var(--text-secondary)' }}>
-                                    Your faculty has encoded live score details for this subject. Final grade, remarks, and weighted totals will appear after the class is marked as verified.
-                                  </div>
-                                )}
+                                {expandedSubject.tab === 'scores' && (() => {
+                                  const midterms = (subject.components || []).filter(c => !c.component_name.toLowerCase().includes('[final]'));
+                                  const finals = (subject.components || []).filter(c => c.component_name.toLowerCase().includes('[final]'));
+                                  
+                                  if (!midterms.length && !finals.length) {
+                                    return (
+                                      <div className="detail-section" style={{ marginBottom: '0' }}>
+                                        <div className="empty-state" style={{ padding: '1rem' }}>No live scores encoded yet</div>
+                                      </div>
+                                    );
+                                  }
 
-                                <div className="metric-strip">
-                                  <div><strong>{formatPercent(subject.major_exam_avg)}</strong><span>Major Exams</span></div>
-                                  <div><strong>{formatPercent(subject.quiz_avg)}</strong><span>Quizzes</span></div>
-                                  <div><strong>{formatPercent(subject.project_avg)}</strong><span>Projects / Attendance</span></div>
-                                  <div>
-                                    <strong style={{ color: canViewFinalGrade ? gradeColor(subject.final_grade) : 'var(--text-muted)' }}>
-                                      {canViewFinalGrade ? formatGrade(subject.final_grade) : 'Pending'}
-                                    </strong>
-                                    <span>Final Grade</span>
-                                  </div>
-                                </div>
+                                  return (
+                                    <>
+                                      {renderComponentSection(midterms, 'Midterm Components')}
+                                      {renderComponentSection(finals, 'Final Components')}
+                                    </>
+                                  );
+                                })()}
 
-                                <div className="detail-section">
-                                  <h3><Percent size={16} />Encoded Grade Components</h3>
-                                  <div className="table-container compact-table component-table-wrap">
-                                    <table>
-                                      <thead>
-                                        <tr>
-                                          <th>Type</th>
-                                          <th>Component</th>
-                                          <th>Score</th>
-                                          <th>Max</th>
-                                          <th>Percent</th>
-                                          <th>Updated</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {(subject.components || []).map(component => {
-                                          const percent = componentPercent(component);
-                                          return (
-                                            <tr key={component.id}>
-                                              <td><span className="badge badge-accent">{categoryLabels[component.category] || component.category}</span></td>
-                                              <td style={{ fontWeight: 600 }}>{component.component_name}</td>
-                                              <td>{component.score ?? '-'}</td>
-                                              <td>{component.max_score}</td>
-                                              <td>{percent != null ? `${percent}%` : '-'}</td>
-                                              <td style={{ color: 'var(--text-secondary)' }}>{formatDateTime(component.updated_at || component.encoded_at)}</td>
-                                            </tr>
-                                          );
-                                        })}
-                                        {!subject.components?.length && <tr><td colSpan={6} className="empty-state">No live scores encoded yet</td></tr>}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                  <div className="component-mobile-list">
-                                    {(subject.components || []).map(component => {
-                                      const percent = componentPercent(component);
-                                      return (
-                                        <div key={component.id} className="component-result-card">
-                                          <div className="component-result-top">
-                                            <span className="badge badge-accent">{categoryLabels[component.category] || component.category}</span>
-                                            <strong>{component.component_name}</strong>
+                                {expandedSubject.tab === 'attendance' && (
+                                  <div className="detail-section" style={{ marginBottom: '0' }}>
+                                    {subject.attendance?.length ? (
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                        {subject.attendance.map(row => (
+                                          <div key={row.id} style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.4rem', 
+                                            padding: '0.25rem 0.6rem', 
+                                            borderRadius: 'var(--radius-full)', 
+                                            fontSize: '0.85rem', 
+                                            background: row.status === 'present' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', 
+                                            border: `1px solid ${row.status === 'present' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                                            color: row.status === 'present' ? 'var(--success)' : 'var(--danger)'
+                                          }}>
+                                            <span style={{ fontSize: '1rem', lineHeight: 1 }}>{row.status === 'present' ? '●' : '○'}</span>
+                                            <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{formatDate(row.attendance_date)}</span>
                                           </div>
-                                          <div className="component-score-grid">
-                                            <div>
-                                              <span>Score</span>
-                                              <strong>{component.score ?? '-'}</strong>
-                                            </div>
-                                            <div>
-                                              <span>Max</span>
-                                              <strong>{component.max_score}</strong>
-                                            </div>
-                                            <div>
-                                              <span>Percent</span>
-                                              <strong>{percent != null ? `${percent}%` : '-'}</strong>
-                                            </div>
-                                          </div>
-                                          <p>Updated {formatDateTime(component.updated_at || component.encoded_at)}</p>
-                                        </div>
-                                      );
-                                    })}
-                                    {!subject.components?.length && (
-                                      <div className="empty-state" style={{ padding: '1rem' }}>No live scores encoded yet</div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="empty-state" style={{ padding: '1rem' }}>No attendance dates encoded yet</div>
                                     )}
                                   </div>
-                                </div>
-
-                                <div className="detail-section">
-                                  <h3><UserCheck size={16} />Attendance</h3>
-                                  <div className="metric-strip">
-                                    <div><strong>{formatPoints(subject.attendance_summary?.total_points)}</strong><span>Present Points</span></div>
-                                    <div><strong>{formatPoints(subject.attendance_summary?.possible_points)}</strong><span>Class Dates</span></div>
-                                    <div><strong>{formatPercent(subject.attendance_summary?.percentage)}</strong><span>Attendance Rate</span></div>
-                                  </div>
-                                  <h3><CalendarDays size={16} />Attendance Dates</h3>
-                                  {subject.attendance?.length ? (
-                                    <div className="attendance-date-grid">
-                                      {subject.attendance.map(row => (
-                                        <div key={row.id} className={`attendance-date-pill ${row.status === 'present' ? 'is-present' : 'is-absent'}`}>
-                                          <span>{formatDate(row.attendance_date)}</span>
-                                          <strong>{row.status === 'present' ? '+1 pt' : '0 pt'}</strong>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <div className="empty-state" style={{ padding: '1rem' }}>No attendance dates encoded yet</div>
-                                  )}
-                                </div>
+                                )}
                               </div>
                             )}
                           </article>

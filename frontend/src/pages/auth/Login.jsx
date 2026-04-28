@@ -54,6 +54,8 @@ export default function Login() {
   };
 
   useEffect(() => {
+    document.body.classList.add('login-theme-lock');
+
     const applyPhilippineTimeTheme = () => {
       setTheme(getLoginThemeForPhilippineTime());
     };
@@ -63,6 +65,7 @@ export default function Login() {
 
     return () => {
       window.clearInterval(intervalId);
+      document.body.classList.remove('login-theme-lock');
       setTheme(previousThemeRef.current);
     };
   }, [setTheme]);
@@ -113,8 +116,9 @@ export default function Login() {
           </form>
 
           <div className="login-footer">
-            <p>Protected academic access for JRMSU College of Engineering.</p>
-            <Link to="/developers" className="login-footer-link">Developed by COEDIGO TEAM</Link>
+            <p className="login-footer-info">Protected academic access for JRMSU College of Engineering.</p>
+            <Link to="/request-account" className="login-footer-cta">Request for Account</Link>
+            <Link to="/developers" className="login-footer-credit">Developed by COEDIGO TEAM</Link>
           </div>
         </section>
       </main>

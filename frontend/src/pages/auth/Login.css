@@ -1,3 +1,9 @@
+body.login-theme-lock .theme-toggle,
+body.login-theme-lock .theme-toggle-floating,
+body.login-theme-lock .topbar-theme-toggle {
+  display: none !important;
+}
+
 .login-page {
   position: relative;
   isolation: isolate;
@@ -72,7 +78,7 @@
   justify-content: space-between;
   background:
     linear-gradient(145deg, rgba(255,255,255,0.84) 0%, rgba(255,231,215,0.68) 34%, rgba(255,120,31,0.82) 100%),
-    url('/coedigo-brand-logo.png') center / 82% no-repeat,
+    url('/jrmsu-campus-bg.webp') center / cover no-repeat,
     #FF7A1A;
   isolation: isolate;
 }
@@ -133,7 +139,7 @@
 [data-theme='dark'] .login-visual {
   background:
     linear-gradient(145deg, rgba(20,20,20,0.96) 0%, rgba(40,40,40,0.86) 36%, rgba(255,147,47,0.88) 100%),
-    url('/coedigo-brand-logo.png') center / 82% no-repeat,
+    url('/jrmsu-campus-bg.webp') center / cover no-repeat,
     #1D1D1D;
 }
 
@@ -323,30 +329,92 @@
 }
 
 .login-footer {
-  margin-top: 1.5rem;
-  text-align: center;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
+  gap: 1rem;
 }
 
-.login-footer p {
-  font-size: 0.75rem;
+[data-theme='dark'] .login-footer {
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+.login-footer-info {
+  font-size: 0.8125rem;
+  color: #8A8A8A;
+  text-align: center;
+  line-height: 1.4;
+  margin: 0;
+}
+
+[data-theme='dark'] .login-footer-info {
+  color: var(--text-secondary);
+}
+
+.login-footer-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 1.5rem;
+  background: rgba(212, 101, 11, 0.08);
+  border: 1.5px solid rgba(212, 101, 11, 0.2);
+  border-radius: 8px;
+  color: #D4650B;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 200ms ease;
+}
+
+.login-footer-cta:hover {
+  background: rgba(212, 101, 11, 0.12);
+  border-color: rgba(212, 101, 11, 0.3);
+  color: #B85609;
+  transform: translateY(-1px);
+}
+
+.login-footer-cta:active {
+  transform: translateY(0);
+}
+
+[data-theme='dark'] .login-footer-cta {
+  background: rgba(255, 147, 47, 0.1);
+  border-color: rgba(255, 147, 47, 0.2);
+  color: var(--accent);
+}
+
+[data-theme='dark'] .login-footer-cta:hover {
+  background: rgba(255, 147, 47, 0.15);
+  border-color: rgba(255, 147, 47, 0.3);
+}
+
+.login-footer-credit {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: #B8B8B8;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-decoration: none;
+  opacity: 0.6;
+  transition: opacity 200ms ease;
+}
+
+.login-footer-credit:hover {
+  opacity: 1;
   color: #8A8A8A;
 }
 
-.login-footer-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  color: #D4650B;
-  font-size: 0.8125rem;
-  font-weight: 700;
+[data-theme='dark'] .login-footer-credit {
+  color: var(--text-muted);
 }
 
-.login-footer-link:hover {
-  color: #B85609;
+[data-theme='dark'] .login-footer-credit:hover {
+  color: var(--text-secondary);
 }
 
 .spinner {

@@ -134,6 +134,11 @@ class AuthMiddleware {
             return $matches[1];
         }
 
+        // Fallback: token in query string (for image/file endpoints)
+        if (isset($_GET['token']) && $_GET['token'] !== '') {
+            return $_GET['token'];
+        }
+
         return null;
     }
 

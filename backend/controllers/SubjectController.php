@@ -44,11 +44,13 @@ class SubjectController {
 
         $stmt = $this->db->prepare("INSERT INTO subjects (code, name, description, units, department, program, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([strtoupper($data['code']), $data['name'], $data['description'] ?? null, $data['units'], $data['department'] ?? null, $data['program'] ?? null, $auth['sub']]);
-        Response::success(['id' => (int)$this->db->lastInsertId()], 'Subject created.', 201);
+        $newId = (int)$this->db->lastInsertId();
+        $this->logAudit($auth['sub'], 'CREATE_SUBJECT', 'subject', $newId, null, $data);
+        Response::success(['id' => $newId], 'Subject created.', 201);
     }
 
     public function update($id) {
-        AuthMiddleware::authorize(['admin', 'faculty']);
+        $auth = AuthMiddleware::authorize(['admin', 'faculty']);
         $data = json_decode(file_get_contents('php://input'), true);
         $fields = []; $params = [];
         foreach (['code','name','description','units','department','program'] as $f) {
@@ -57,12 +59,21 @@ class SubjectController {
         if (empty($fields)) Response::error('No fields to update.', 400);
         $params[] = $id;
         $this->db->prepare("UPDATE subjects SET " . implode(', ', $fields) . " WHERE id = ?")->execute($params);
+        $this->logAudit($auth['sub'], 'UPDATE_SUBJECT', 'subject', $id, null, $data);
         Response::success(null, 'Subject updated.');
     }
 
     public function delete($id) {
-        AuthMiddleware::authorize(['admin']);
+        $auth = AuthMiddleware::authorize(['admin']);
         $this->db->prepare("UPDATE subjects SET is_active = 0 WHERE id = ?")->execute([$id]);
+        $this->logAudit($auth['sub'], 'DEACTIVATE_SUBJECT', 'subject', $id);
         Response::success(null, 'Subject deactivated.');
+    }
+
+    private function logAudit($userId, $action, $entityType = null, $entityId = null, $oldValues = null, $newValues = null) {
+        try {
+            $stmt = $this->db->prepare("INSERT INTO audit_logs (user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$userId, $action, $entityType, $entityId, $oldValues ? json_encode($oldValues) : null, $newValues ? json_encode($newValues) : null, $_SERVER['REMOTE_ADDR'] ?? null, $_SERVER['HTTP_USER_AGENT'] ?? null]);
+        } catch (Exception $e) {}
     }
 }

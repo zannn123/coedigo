@@ -38,6 +38,9 @@ class GradeController {
             $grade = $this->db->prepare("SELECT * FROM grades WHERE enrollment_id = ?");
             $grade->execute([$student['enrollment_id']]);
             $student['grade'] = $grade->fetch() ?: null;
+            if ($student['grade']) {
+                $student['grade']['attendance_included'] = true;
+            }
 
             $student['attendance'] = $this->getAttendanceRows($student['enrollment_id']);
             $student['attendance_summary'] = $this->buildAttendanceSummary($student['attendance']);
@@ -67,6 +70,7 @@ class GradeController {
         $this->db->beginTransaction();
         try {
             $changed = false;
+            $changedComponents = [];
 
             if (!empty($deleteIds) && is_array($deleteIds)) {
                 $deleteIds = array_values(array_filter($deleteIds, function($id) { return is_numeric($id); }));
@@ -74,7 +78,10 @@ class GradeController {
                     $placeholders = implode(',', array_fill(0, count($deleteIds), '?'));
                     $delete = $this->db->prepare("DELETE FROM grade_components WHERE id IN ($placeholders) AND enrollment_id = ?");
                     $delete->execute(array_merge($deleteIds, [$enrollmentId]));
-                    $changed = $changed || $delete->rowCount() > 0;
+                    if ($delete->rowCount() > 0) {
+                        $changed = true;
+                        $changedComponents[] = "Some items removed";
+                    }
                 }
             }
 
@@ -87,6 +94,8 @@ class GradeController {
                 if ($componentName === '') {
                     continue;
                 }
+
+                $scoreText = $score !== null ? "{$score}/{$maxScore}" : "Pending";
 
                 if (!empty($comp['id'])) {
                     $existing = $this->db->prepare("SELECT id, category, component_name, max_score, score FROM grade_components WHERE id = ? AND enrollment_id = ?");
@@ -101,11 +110,13 @@ class GradeController {
                         $stmt = $this->db->prepare("UPDATE grade_components SET score = ?, max_score = ?, component_name = ?, category = ?, updated_at = NOW() WHERE id = ? AND enrollment_id = ?");
                         $stmt->execute([$score, $maxScore, $componentName, $category, $comp['id'], $enrollmentId]);
                         $changed = true;
+                        $changedComponents[] = "{$componentName} ({$scoreText})";
                     }
                 } else {
                     $stmt = $this->db->prepare("INSERT INTO grade_components (enrollment_id, category, component_name, max_score, score, encoded_by) VALUES (?, ?, ?, ?, ?, ?)");
                     $stmt->execute([$enrollmentId, $category, $componentName, $maxScore, $score, $auth['sub']]);
                     $changed = true;
+                    $changedComponents[] = "{$componentName} ({$scoreText})";
                 }
             }
 
@@ -114,7 +125,8 @@ class GradeController {
             $savedComponents = $this->getGradeComponents($enrollmentId);
 
             if ($changed) {
-                $this->notifyScoreUpdate($enrollmentId);
+                $this->logAudit($auth['sub'], 'ENCODE_SCORES', 'enrollment', $enrollmentId, null, ['changes' => $changedComponents]);
+                $this->notifyScoreUpdate($enrollmentId, $changedComponents);
             }
 
             $this->db->commit();
@@ -199,6 +211,11 @@ class GradeController {
             $grade = $this->computeGradeInternal($enrollmentId, $auth['sub']);
             $rows = $this->getAttendanceRows($enrollmentId);
             $statusReset = $changed ? $this->resetClassStatusToDraft($enrollmentId) : false;
+            
+            if ($changed) {
+                $this->logAudit($auth['sub'], 'SAVE_ATTENDANCE', 'enrollment', $enrollmentId);
+            }
+            
             $this->db->commit();
 
             Response::success([
@@ -286,7 +303,8 @@ class GradeController {
             $this->db->prepare("DELETE FROM grade_components WHERE id = ?")->execute([$id]);
             $grade = $this->computeGradeInternal($component['enrollment_id'], $auth['sub']);
             $statusReset = $this->resetClassStatusToDraft($component['enrollment_id']);
-            $this->notifyScoreUpdate($component['enrollment_id']);
+            $this->logAudit($auth['sub'], 'DELETE_GRADE_COMPONENT', 'grade_component', $id, ['component_id' => $id, 'enrollment_id' => $component['enrollment_id']]);
+            $this->notifyScoreUpdate($component['enrollment_id'], ['A score component was removed']);
             $this->db->commit();
 
             Response::success([
@@ -303,20 +321,32 @@ class GradeController {
         $this->syncAttendanceComponent($enrollmentId, $encodedBy);
 
         $settings = $this->db->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('major_exam_weight','quiz_weight','project_weight','passing_grade','grade_scale')")->fetchAll(PDO::FETCH_KEY_PAIR);
-        $examWeight = ((float)($settings['major_exam_weight'] ?? 40)) / 100;
+        $examWeight = ((float)($settings['major_exam_weight'] ?? 30)) / 100;
         $quizWeight = ((float)($settings['quiz_weight'] ?? 30)) / 100;
-        $projWeight = ((float)($settings['project_weight'] ?? 30)) / 100;
+        $projWeight = ((float)($settings['project_weight'] ?? 40)) / 100;
         $passingGrade = (float)($settings['passing_grade'] ?? 3.00);
-        $gradeScale = explode(',', $settings['grade_scale'] ?? '1.00,1.25,1.50,1.75,2.00,2.25,2.50,2.75,3.00,5.00');
+        $gradeScale = explode(',', $settings['grade_scale'] ?? '1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,5.0');
 
-        $stmt = $this->db->prepare("SELECT category, AVG(CASE WHEN max_score > 0 THEN (score / max_score) * 100 ELSE 0 END) as avg_pct FROM grade_components WHERE enrollment_id = ? AND score IS NOT NULL GROUP BY category");
+        $stmt = $this->db->prepare("
+            SELECT category, component_name, max_score, score
+            FROM grade_components
+            WHERE enrollment_id = ?
+              AND score IS NOT NULL
+              AND component_name != 'Attendance'
+            ORDER BY category, component_name
+        ");
         $stmt->execute([$enrollmentId]);
-        $avgs = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        $terms = $this->organizeComponentsByTerm($stmt->fetchAll());
+        $attendanceTerms = $this->splitAttendanceRowsByTerm($this->getAttendanceRows($enrollmentId));
 
-        $examAvg = (float)($avgs['major_exam'] ?? 0);
-        $quizAvg = (float)($avgs['quiz'] ?? 0);
-        $projAvg = (float)($avgs['project'] ?? 0);
-        $weighted = ($examAvg * $examWeight) + ($quizAvg * $quizWeight) + ($projAvg * $projWeight);
+        $midterm = $this->calculateTermStats($terms['midterm'], $attendanceTerms['midterm'], $examWeight, $quizWeight, $projWeight);
+        $final = $this->calculateTermStats($terms['final'], $attendanceTerms['final'], $examWeight, $quizWeight, $projWeight);
+        $hasAny = $midterm['has_scores'] || $final['has_scores'];
+
+        $examAvg = $this->averagePresentValues([$midterm['major_exam_avg'], $final['major_exam_avg']]) ?? 0;
+        $quizAvg = $this->averagePresentValues([$midterm['quiz_avg'], $final['quiz_avg']]) ?? 0;
+        $projAvg = $this->averagePresentValues([$midterm['project_avg'], $final['project_avg']]) ?? 0;
+        $weighted = $hasAny ? (($midterm['weighted_score'] ?? 0) * 0.5) + (($final['weighted_score'] ?? 0) * 0.5) : 0;
         $finalGrade = $this->mapToGradeScale($weighted, $gradeScale);
         $remarks = $finalGrade <= $passingGrade ? 'Passed' : 'Failed';
 
@@ -334,8 +364,139 @@ class GradeController {
             'project_avg' => round($projAvg, 2),
             'weighted_score' => round($weighted, 2),
             'final_grade' => $finalGrade,
-            'remarks' => $remarks
+            'remarks' => $remarks,
+            'midterm_average' => $midterm['weighted_score'] !== null ? round($midterm['weighted_score'], 2) : null,
+            'final_average' => $final['weighted_score'] !== null ? round($final['weighted_score'], 2) : null,
+            'attendance_included' => true
         ];
+    }
+
+    private function organizeComponentsByTerm($components) {
+        $terms = [
+            'midterm' => ['major_exam' => [], 'quiz' => [], 'project' => []],
+            'final' => ['major_exam' => [], 'quiz' => [], 'project' => []],
+        ];
+        $categories = ['major_exam', 'quiz', 'project'];
+
+        foreach ($categories as $category) {
+            $categoryComponents = array_values(array_filter($components, function ($component) use ($category) {
+                return ($component['category'] ?? '') === $category;
+            }));
+            $unassigned = [];
+            $assignedCount = 0;
+
+            foreach ($categoryComponents as $component) {
+                $term = $this->detectAssessmentTerm($component['component_name'] ?? '');
+                if ($term) {
+                    $terms[$term][$category][] = $component;
+                    $assignedCount++;
+                } else {
+                    $unassigned[] = $component;
+                }
+            }
+
+            if (empty($unassigned)) {
+                continue;
+            }
+
+            if ($assignedCount === 0) {
+                $midtermCount = (int)ceil(count($unassigned) / 2);
+                foreach ($unassigned as $index => $component) {
+                    $terms[$index < $midtermCount ? 'midterm' : 'final'][$category][] = $component;
+                }
+                continue;
+            }
+
+            foreach ($unassigned as $component) {
+                $terms['midterm'][$category][] = $component;
+            }
+        }
+
+        return $terms;
+    }
+
+    private function detectAssessmentTerm($name) {
+        $text = strtolower((string)$name);
+        if (preg_match('/\bfinal\b|\bfinals\b|\bfin\b/', $text)) {
+            return 'final';
+        }
+        if (preg_match('/\bmidterm\b|\bmid-term\b|\bmid\b|\bprelim\b/', $text)) {
+            return 'midterm';
+        }
+        return null;
+    }
+
+    private function splitAttendanceRowsByTerm($rows) {
+        usort($rows, function ($a, $b) {
+            return strcmp((string)($a['attendance_date'] ?? ''), (string)($b['attendance_date'] ?? ''));
+        });
+        $midtermCount = (int)ceil(count($rows) / 2);
+
+        return [
+            'midterm' => array_slice($rows, 0, $midtermCount),
+            'final' => array_slice($rows, $midtermCount),
+        ];
+    }
+
+    private function calculateTermStats($termComponents, $attendanceRows, $examWeight, $quizWeight, $projWeight) {
+        $examAvg = $this->transmutedAverage($termComponents['major_exam'] ?? []);
+        $quizAvg = $this->transmutedAverage($termComponents['quiz'] ?? []);
+        $projectValues = $this->transmutedValues($termComponents['project'] ?? []);
+        $attendanceValue = $this->transmutedAttendanceValue($attendanceRows);
+
+        if ($attendanceValue !== null) {
+            $projectValues[] = $attendanceValue;
+        }
+
+        $projectAvg = $this->averagePresentValues($projectValues);
+        $hasScores = $examAvg !== null || $quizAvg !== null || $projectAvg !== null;
+        $weighted = $hasScores
+            ? (($examAvg ?? 0) * $examWeight) + (($quizAvg ?? 0) * $quizWeight) + (($projectAvg ?? 0) * $projWeight)
+            : null;
+
+        return [
+            'major_exam_avg' => $examAvg,
+            'quiz_avg' => $quizAvg,
+            'project_avg' => $projectAvg,
+            'weighted_score' => $weighted,
+            'has_scores' => $hasScores,
+        ];
+    }
+
+    private function transmutedAverage($components) {
+        return $this->averagePresentValues($this->transmutedValues($components));
+    }
+
+    private function transmutedValues($components) {
+        $values = [];
+        foreach ($components as $component) {
+            $maxScore = (float)($component['max_score'] ?? 0);
+            if ($maxScore > 0 && is_numeric($component['score'] ?? null)) {
+                $values[] = (((float)$component['score'] / $maxScore) * 50) + 50;
+            }
+        }
+        return $values;
+    }
+
+    private function transmutedAttendanceValue($rows) {
+        if (empty($rows)) return null;
+
+        $points = 0.0;
+        foreach ($rows as $row) {
+            $points += (float)($row['points'] ?? 0);
+        }
+
+        return (($points / count($rows)) * 50) + 50;
+    }
+
+    private function averagePresentValues($values) {
+        $values = array_values(array_filter($values, function ($value) {
+            return $value !== null && $value !== '' && is_numeric($value);
+        }));
+
+        if (empty($values)) return null;
+
+        return array_sum(array_map('floatval', $values)) / count($values);
     }
 
     private function ensureAttendanceTable() {
@@ -447,7 +608,7 @@ class GradeController {
         return (string)$classRecord['grade_status'] !== 'draft';
     }
 
-    private function notifyScoreUpdate($enrollmentId) {
+    private function notifyScoreUpdate($enrollmentId, $changedComponents = []) {
         $context = $this->db->prepare("
             SELECT e.student_id, cr.id AS class_id, s.name AS subject_name, cr.section
             FROM enrollments e
@@ -462,6 +623,16 @@ class GradeController {
             return;
         }
 
+        $changesText = '';
+        if (!empty($changedComponents)) {
+            $limited = array_slice($changedComponents, 0, 3);
+            $changesText = " Updates: " . implode(', ', $limited);
+            if (count($changedComponents) > 3) {
+                $changesText .= " and " . (count($changedComponents) - 3) . " more";
+            }
+            $changesText .= ".";
+        }
+
         $notif = $this->db->prepare("
             INSERT INTO notifications (user_id, title, message, type, reference_type, reference_id)
             VALUES (?, ?, ?, 'grade_updated', 'class_record', ?)
@@ -469,21 +640,40 @@ class GradeController {
         $notif->execute([
             $row['student_id'],
             'Scores Updated',
-            "Your live scores for {$row['subject_name']} ({$row['section']}) were updated. Final marks stay hidden until faculty verification.",
+            "Your live scores for {$row['subject_name']} ({$row['section']}) were updated.{$changesText} Final marks stay hidden until faculty verification.",
             $row['class_id'],
         ]);
     }
 
     private function mapToGradeScale($weighted, $gradeScale) {
-        if ($weighted >= 97) return 1.00;
-        if ($weighted >= 94) return 1.25;
-        if ($weighted >= 91) return 1.50;
-        if ($weighted >= 88) return 1.75;
+        if ($weighted >= 99) return 1.00;
+        if ($weighted >= 97) return 1.10;
+        if ($weighted >= 95) return 1.20;
+        if ($weighted >= 93) return 1.30;
+        if ($weighted >= 91) return 1.40;
+        if ($weighted >= 90) return 1.50;
+        if ($weighted >= 89) return 1.60;
+        if ($weighted >= 88) return 1.70;
+        if ($weighted >= 87) return 1.80;
+        if ($weighted >= 86) return 1.90;
         if ($weighted >= 85) return 2.00;
-        if ($weighted >= 82) return 2.25;
-        if ($weighted >= 79) return 2.50;
-        if ($weighted >= 76) return 2.75;
+        if ($weighted >= 84) return 2.10;
+        if ($weighted >= 83) return 2.20;
+        if ($weighted >= 82) return 2.30;
+        if ($weighted >= 81) return 2.40;
+        if ($weighted >= 80) return 2.50;
+        if ($weighted >= 79) return 2.60;
+        if ($weighted >= 78) return 2.70;
+        if ($weighted >= 77) return 2.80;
+        if ($weighted >= 76) return 2.90;
         if ($weighted >= 75) return 3.00;
         return 5.00;
+    }
+
+    private function logAudit($userId, $action, $entityType = null, $entityId = null, $oldValues = null, $newValues = null) {
+        try {
+            $stmt = $this->db->prepare("INSERT INTO audit_logs (user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$userId, $action, $entityType, $entityId, $oldValues ? json_encode($oldValues) : null, $newValues ? json_encode($newValues) : null, $_SERVER['REMOTE_ADDR'] ?? null, $_SERVER['HTTP_USER_AGENT'] ?? null]);
+        } catch (Exception $e) {}
     }
 }

@@ -65,7 +65,9 @@ class ClassController {
 
         $stmt = $this->db->prepare("INSERT INTO class_records (subject_id, faculty_id, section, academic_year, semester, schedule, room, max_students) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$data['subject_id'], $auth['sub'], $data['section'], $data['academic_year'], $data['semester'], $data['schedule'] ?? null, $data['room'] ?? null, $data['max_students'] ?? 50]);
-        Response::success(['id' => (int)$this->db->lastInsertId()], 'Class record created.', 201);
+        $newId = (int)$this->db->lastInsertId();
+        $this->logAudit($auth['sub'], 'CREATE_CLASS_RECORD', 'class_record', $newId, null, $data);
+        Response::success(['id' => $newId], 'Class record created.', 201);
     }
 
     public function update($id) {
@@ -84,6 +86,7 @@ class ClassController {
         if (empty($fields)) Response::error('No fields to update.', 400);
         $params[] = $id;
         $this->db->prepare("UPDATE class_records SET " . implode(', ', $fields) . " WHERE id = ?")->execute($params);
+        $this->logAudit($auth['sub'], 'UPDATE_CLASS_RECORD', 'class_record', $id, null, $data);
         Response::success(null, 'Class record updated.');
     }
 
@@ -123,6 +126,7 @@ class ClassController {
                 ]);
             }
         }
+        $this->logAudit($auth['sub'], 'ENROLL_STUDENTS', 'class_record', $id, null, ['enrolled_count' => $enrolled, 'student_ids' => $studentIds]);
         Response::success(['enrolled' => $enrolled], "$enrolled student(s) enrolled.");
     }
 
@@ -133,6 +137,7 @@ class ClassController {
         if (!$stmt->fetch()) Response::error('Unauthorized.', 403);
 
         $this->db->prepare("UPDATE enrollments SET is_active = 0 WHERE class_record_id = ? AND student_id = ?")->execute([$classId, $studentId]);
+        $this->logAudit($auth['sub'], 'REMOVE_STUDENT', 'class_record', $classId, null, ['student_id' => $studentId]);
         Response::success(null, 'Student removed from class.');
     }
 
@@ -190,6 +195,15 @@ class ClassController {
             }
         }
 
+        $this->logAudit($auth['sub'], 'UPDATE_GRADE_STATUS', 'class_record', $id, null, ['status' => $status]);
+
         Response::success(null, 'Grade status updated.');
+    }
+
+    private function logAudit($userId, $action, $entityType = null, $entityId = null, $oldValues = null, $newValues = null) {
+        try {
+            $stmt = $this->db->prepare("INSERT INTO audit_logs (user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$userId, $action, $entityType, $entityId, $oldValues ? json_encode($oldValues) : null, $newValues ? json_encode($newValues) : null, $_SERVER['REMOTE_ADDR'] ?? null, $_SERVER['HTTP_USER_AGENT'] ?? null]);
+        } catch (Exception $e) {}
     }
 }

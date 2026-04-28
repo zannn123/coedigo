@@ -34,18 +34,32 @@ export default function AuditLogs() {
 
       <div className="table-container">
         <table>
-          <thead><tr><th>Timestamp</th><th>User</th><th>Role</th><th>Action</th><th>Entity</th><th>IP Address</th></tr></thead>
+          <thead><tr><th>Timestamp</th><th>User</th><th>Role</th><th>Action</th><th>Entity</th><th>Details</th><th>IP Address</th></tr></thead>
           <tbody>
-            {logs.map(l => (
+            {logs.map(l => {
+              let details = '—';
+              try {
+                if (l.new_values) {
+                  const data = JSON.parse(l.new_values);
+                  details = Object.entries(data).map(([k,v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' | ');
+                } else if (l.old_values) {
+                  const data = JSON.parse(l.old_values);
+                  details = `Prev: ${Object.entries(data).map(([k,v]) => `${k}: ${v}`).join(' | ')}`;
+                }
+              } catch(e) { details = l.new_values || l.old_values || '—'; }
+
+              return (
               <tr key={l.id}>
                 <td style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{new Date(l.created_at).toLocaleString()}</td>
                 <td style={{ fontWeight: 500 }}>{l.user_name || 'System'}</td>
                 <td><span className="badge badge-accent">{l.user_role || '—'}</span></td>
                 <td style={{ fontWeight: 500 }}>{l.action?.replace(/_/g, ' ')}</td>
                 <td style={{ color: 'var(--text-secondary)' }}>{l.entity_type ? `${l.entity_type} #${l.entity_id}` : '—'}</td>
+                <td style={{ fontSize: '0.75rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={details}>{details}</td>
                 <td style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>{l.ip_address || '—'}</td>
               </tr>
-            ))}
+              );
+            })}
             {!logs.length && <tr><td colSpan={6} className="empty-state">No logs found</td></tr>}
           </tbody>
         </table>

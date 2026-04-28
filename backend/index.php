@@ -5,6 +5,9 @@
  * Jose Rizal Memorial State University
  */
 
+// Buffer output so PHP warnings don't corrupt JSON responses
+ob_start();
+
 // CORS Headers
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -24,7 +27,23 @@ $path = parse_url($requestUri, PHP_URL_PATH);
 // Remove base path prefix if behind a subdirectory
 $path = preg_replace('#^.*/api#', '/api', $path);
 
+// Normalize path to handle trailing slashes robustly
+if ($path !== '/' && $path !== '/api') {
+    $path = rtrim($path, '/');
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
+
+// Root health check endpoint to prevent "Endpoint not found" on base URL
+if (($path === '/' || $path === '/api') && $method === 'GET') {
+    require_once __DIR__ . '/utils/Response.php';
+    Response::success([
+        'name' => 'C.O.E.D.I.G.O. API',
+        'version' => '1.0.0',
+        'status' => 'operational'
+    ], 'API is running successfully.');
+    exit;
+}
 
 // Simple router
 $routes = [];
@@ -215,6 +234,16 @@ elseif ($path === '/api/audit-logs' && $method === 'GET') {
     (new AuditController())->index();
 }
 
+// --- ERROR LOG ROUTES ---
+elseif ($path === '/api/error-logs' && $method === 'GET') {
+    require_once __DIR__ . '/controllers/ErrorLogController.php';
+    (new ErrorLogController())->index();
+}
+elseif ($path === '/api/error-logs' && $method === 'POST') {
+    require_once __DIR__ . '/controllers/ErrorLogController.php';
+    (new ErrorLogController())->store();
+}
+
 // --- SYSTEM SETTINGS ---
 elseif ($path === '/api/settings' && $method === 'GET') {
     require_once __DIR__ . '/config/database.php';
@@ -242,6 +271,28 @@ elseif ($path === '/api/settings' && $method === 'PUT') {
         ")->execute([$key, $value, $auth['sub']]);
     }
     Response::success(null, 'Settings updated.');
+}
+
+// --- ACCOUNT REQUEST ROUTES ---
+elseif ($path === '/api/account-requests' && $method === 'POST') {
+    require_once __DIR__ . '/controllers/AccountRequestController.php';
+    (new AccountRequestController())->store();
+}
+elseif ($path === '/api/account-requests' && $method === 'GET') {
+    require_once __DIR__ . '/controllers/AccountRequestController.php';
+    (new AccountRequestController())->index();
+}
+elseif (preg_match('#^/api/account-requests/(\d+)/photo$#', $path, $m) && $method === 'GET') {
+    require_once __DIR__ . '/controllers/AccountRequestController.php';
+    (new AccountRequestController())->photo($m[1]);
+}
+elseif (preg_match('#^/api/account-requests/(\d+)/approve$#', $path, $m) && $method === 'POST') {
+    require_once __DIR__ . '/controllers/AccountRequestController.php';
+    (new AccountRequestController())->approve($m[1]);
+}
+elseif (preg_match('#^/api/account-requests/(\d+)/reject$#', $path, $m) && $method === 'POST') {
+    require_once __DIR__ . '/controllers/AccountRequestController.php';
+    (new AccountRequestController())->reject($m[1]);
 }
 
 // --- 404 ---
