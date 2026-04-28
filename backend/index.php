@@ -123,6 +123,14 @@ elseif (preg_match('#^/api/subjects/(\d+)$#', $path, $m) && $method === 'DELETE'
     require_once __DIR__ . '/controllers/SubjectController.php';
     (new SubjectController())->delete($m[1]);
 }
+elseif (preg_match('#^/api/subjects/(\d+)/approve$#', $path, $m) && $method === 'POST') {
+    require_once __DIR__ . '/controllers/SubjectController.php';
+    (new SubjectController())->approve($m[1]);
+}
+elseif (preg_match('#^/api/subjects/(\d+)/reject$#', $path, $m) && $method === 'POST') {
+    require_once __DIR__ . '/controllers/SubjectController.php';
+    (new SubjectController())->reject($m[1]);
+}
 
 // --- CLASS RECORD ROUTES ---
 elseif ($path === '/api/classes' && $method === 'GET') {
@@ -159,6 +167,10 @@ elseif (preg_match('#^/api/grades/class/(\d+)$#', $path, $m) && $method === 'GET
     require_once __DIR__ . '/controllers/GradeController.php';
     (new GradeController())->getClassGrades($m[1]);
 }
+elseif (preg_match('#^/api/grades/class/(\d+)/assessments$#', $path, $m) && $method === 'PUT') {
+    require_once __DIR__ . '/controllers/GradeController.php';
+    (new GradeController())->saveClassAssessments($m[1]);
+}
 elseif ($path === '/api/grades/encode' && $method === 'POST') {
     require_once __DIR__ . '/controllers/GradeController.php';
     (new GradeController())->encodeScores();
@@ -166,6 +178,10 @@ elseif ($path === '/api/grades/encode' && $method === 'POST') {
 elseif ($path === '/api/grades/attendance' && $method === 'POST') {
     require_once __DIR__ . '/controllers/GradeController.php';
     (new GradeController())->saveAttendance();
+}
+elseif ($path === '/api/grades/attendance/class' && $method === 'POST') {
+    require_once __DIR__ . '/controllers/GradeController.php';
+    (new GradeController())->saveClassAttendance();
 }
 elseif (preg_match('#^/api/grades/compute/(\d+)$#', $path, $m) && $method === 'POST') {
     require_once __DIR__ . '/controllers/GradeController.php';

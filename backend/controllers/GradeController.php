@@ -13,7 +13,9 @@ class GradeController {
     public function __construct() {
         $database = new Database();
         $this->db = $database->getConnection();
+        $this->ensureClassRecordColumns();
         $this->ensureAttendanceTable();
+        $this->ensureGradeAssessmentTable();
     }
 
     /** GET /api/grades/class/:classId - Get grade book for a class */
@@ -25,6 +27,8 @@ class GradeController {
             $check->execute([$classId, $auth['sub']]);
             if (!$check->fetch()) Response::error('Unauthorized.', 403);
         }
+
+        $classAssessments = $this->getClassAssessments($classId);
 
         $stmt = $this->db->prepare("SELECT e.id as enrollment_id, u.id as student_id, u.student_id as student_number, u.first_name, u.last_name, u.program, u.year_level FROM enrollments e INNER JOIN users u ON e.student_id = u.id WHERE e.class_record_id = ? AND e.is_active = 1 ORDER BY u.last_name, u.first_name");
         $stmt->execute([$classId]);
@@ -46,7 +50,100 @@ class GradeController {
             $student['attendance_summary'] = $this->buildAttendanceSummary($student['attendance']);
         }
 
-        Response::success($students);
+        Response::success([
+            'students' => $students,
+            'assessments' => $classAssessments,
+        ]);
+    }
+
+    /** PUT /api/grades/class/:classId/assessments - Save class assessment definitions */
+    public function saveClassAssessments($classId) {
+        $auth = AuthMiddleware::authorize(['faculty']);
+        $data = json_decode(file_get_contents('php://input'), true);
+        $assessments = $data['assessments'] ?? [];
+        $deleteIds = $data['delete_ids'] ?? [];
+
+        if (!is_array($assessments) || !is_array($deleteIds)) {
+            Response::error('Assessment changes are required.', 400);
+        }
+
+        $check = $this->db->prepare("SELECT id FROM class_records WHERE id = ? AND faculty_id = ?");
+        $check->execute([$classId, $auth['sub']]);
+        if (!$check->fetch()) Response::error('Unauthorized.', 403);
+
+        $this->db->beginTransaction();
+        try {
+            if (!empty($deleteIds)) {
+                $deleteIds = array_values(array_filter($deleteIds, function($id) { return is_numeric($id); }));
+                if (!empty($deleteIds)) {
+                    $placeholders = implode(',', array_fill(0, count($deleteIds), '?'));
+                    $this->db->prepare("DELETE FROM grade_assessments WHERE id IN ($placeholders) AND class_record_id = ?")
+                        ->execute(array_merge($deleteIds, [$classId]));
+                }
+            }
+
+            $saved = [];
+            foreach ($assessments as $assessment) {
+                $category = trim((string)($assessment['category'] ?? ''));
+                $componentName = trim((string)($assessment['component_name'] ?? ''));
+                $maxScore = $this->normalizeDecimal($assessment['max_score'] ?? 0, false) ?? 0.0;
+                $clientKey = $assessment['client_key'] ?? null;
+
+                if (!in_array($category, ['major_exam', 'quiz', 'project'], true)) {
+                    throw new InvalidArgumentException('Assessment category is invalid.');
+                }
+                if ($componentName === '') {
+                    throw new InvalidArgumentException('Every assessment needs a name.');
+                }
+                if ($maxScore <= 0) {
+                    throw new InvalidArgumentException("Assessment '{$componentName}' needs a max score greater than 0.");
+                }
+
+                if (!empty($assessment['id'])) {
+                    $existing = $this->db->prepare("SELECT id, category, component_name FROM grade_assessments WHERE id = ? AND class_record_id = ?");
+                    $existing->execute([$assessment['id'], $classId]);
+                    $old = $existing->fetch();
+                    if (!$old) {
+                        throw new RuntimeException('Assessment definition not found.');
+                    }
+
+                    $this->db->prepare("UPDATE grade_assessments SET category = ?, component_name = ?, max_score = ?, updated_at = NOW() WHERE id = ? AND class_record_id = ?")
+                        ->execute([$category, $componentName, $maxScore, $assessment['id'], $classId]);
+
+                    if ($old['category'] !== $category || trim((string)$old['component_name']) !== $componentName) {
+                        $this->renameClassGradeComponents($classId, $old['category'], $old['component_name'], $category, $componentName, $maxScore);
+                    } else {
+                        $this->updateClassGradeComponentMaxScore($classId, $category, $componentName, $maxScore);
+                    }
+
+                    $saved[] = $this->formatAssessmentDefinition($assessment['id'], $category, $componentName, $maxScore, $clientKey);
+                } else {
+                    $existing = $this->db->prepare("SELECT id FROM grade_assessments WHERE class_record_id = ? AND category = ? AND component_name = ?");
+                    $existing->execute([$classId, $category, $componentName]);
+                    $existingId = $existing->fetchColumn();
+
+                    if ($existingId) {
+                        $this->db->prepare("UPDATE grade_assessments SET max_score = ?, updated_at = NOW() WHERE id = ?")
+                            ->execute([$maxScore, $existingId]);
+                        $saved[] = $this->formatAssessmentDefinition($existingId, $category, $componentName, $maxScore, $clientKey);
+                    } else {
+                        $stmt = $this->db->prepare("INSERT INTO grade_assessments (class_record_id, category, component_name, max_score, created_by) VALUES (?, ?, ?, ?, ?)");
+                        $stmt->execute([$classId, $category, $componentName, $maxScore, $auth['sub']]);
+                        $saved[] = $this->formatAssessmentDefinition($this->db->lastInsertId(), $category, $componentName, $maxScore, $clientKey);
+                    }
+                }
+            }
+
+            $this->db->commit();
+            Response::success(['assessments' => $saved], 'Assessments saved.');
+        } catch (InvalidArgumentException $e) {
+            $this->db->rollBack();
+            Response::error($e->getMessage(), 422);
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            error_log('Save assessments error: ' . $e->getMessage());
+            Response::error('Failed to save assessments.', 500);
+        }
     }
 
     /** POST /api/grades/encode - Encode scores (faculty only) */
@@ -91,11 +188,23 @@ class GradeController {
                 $maxScore = $this->normalizeDecimal($comp['max_score'] ?? 0, false) ?? 0.0;
                 $score = $this->normalizeDecimal($comp['score'] ?? null);
 
-                if ($componentName === '') {
+                // Skip empty components (drafts without data)
+                if ($componentName === '' || $category === '') {
                     continue;
                 }
 
+                // Only validate max score if there's actually a score being saved
+                if ($score !== null && $maxScore <= 0) {
+                    throw new InvalidArgumentException("Assessment '{$componentName}' must have a max score greater than 0 when saving scores.");
+                }
+
+                // Set default max score for new assessments without scores
+                if ($maxScore <= 0) {
+                    $maxScore = $category === 'quiz' ? 50.0 : 100.0;
+                }
+
                 $scoreText = $score !== null ? "{$score}/{$maxScore}" : "Pending";
+                $this->ensureAssessmentDefinitionForEnrollment($enrollmentId, $category, $componentName, $maxScore, $auth['sub']);
 
                 if (!empty($comp['id'])) {
                     $existing = $this->db->prepare("SELECT id, category, component_name, max_score, score FROM grade_components WHERE id = ? AND enrollment_id = ?");
@@ -113,10 +222,13 @@ class GradeController {
                         $changedComponents[] = "{$componentName} ({$scoreText})";
                     }
                 } else {
-                    $stmt = $this->db->prepare("INSERT INTO grade_components (enrollment_id, category, component_name, max_score, score, encoded_by) VALUES (?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$enrollmentId, $category, $componentName, $maxScore, $score, $auth['sub']]);
-                    $changed = true;
-                    $changedComponents[] = "{$componentName} ({$scoreText})";
+                    // Only create new component if it has a score or is being explicitly created
+                    if ($score !== null || !empty($comp['force_create'])) {
+                        $stmt = $this->db->prepare("INSERT INTO grade_components (enrollment_id, category, component_name, max_score, score, encoded_by) VALUES (?, ?, ?, ?, ?, ?)");
+                        $stmt->execute([$enrollmentId, $category, $componentName, $maxScore, $score, $auth['sub']]);
+                        $changed = true;
+                        $changedComponents[] = "{$componentName} (New assessment)";
+                    }
                 }
             }
 
@@ -137,9 +249,14 @@ class GradeController {
                 'grade' => $grade,
                 'components' => $savedComponents,
             ], $changed ? 'Scores saved. Final marks remain hidden until verification.' : 'No score changes detected.');
+        } catch (InvalidArgumentException $e) {
+            $this->db->rollBack();
+            error_log('Validation error in encode scores: ' . $e->getMessage());
+            Response::error($e->getMessage(), 422);
         } catch (Exception $e) {
             $this->db->rollBack();
-            Response::error('Failed to encode scores.', 500);
+            error_log('Encode scores error: ' . $e->getMessage());
+            Response::error('Failed to encode scores: ' . $e->getMessage(), 500);
         }
     }
 
@@ -211,11 +328,11 @@ class GradeController {
             $grade = $this->computeGradeInternal($enrollmentId, $auth['sub']);
             $rows = $this->getAttendanceRows($enrollmentId);
             $statusReset = $changed ? $this->resetClassStatusToDraft($enrollmentId) : false;
-            
+
             if ($changed) {
                 $this->logAudit($auth['sub'], 'SAVE_ATTENDANCE', 'enrollment', $enrollmentId);
             }
-            
+
             $this->db->commit();
 
             Response::success([
@@ -231,6 +348,84 @@ class GradeController {
         } catch (Exception $e) {
             $this->db->rollBack();
             Response::error('Failed to save attendance.', 500);
+        }
+    }
+
+    /** POST /api/grades/attendance/class - Save one dated attendance sheet for a class */
+    public function saveClassAttendance() {
+        $auth = AuthMiddleware::authorize(['faculty']);
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        $classId = $data['class_id'] ?? null;
+        $date = trim($data['attendance_date'] ?? '');
+        $rows = $data['attendance'] ?? [];
+
+        if (!$classId || !$this->isValidDate($date) || !is_array($rows)) {
+            Response::error('Class, attendance date, and attendance rows are required.', 400);
+        }
+
+        $check = $this->db->prepare("SELECT id FROM class_records WHERE id = ? AND faculty_id = ?");
+        $check->execute([$classId, $auth['sub']]);
+        if (!$check->fetch()) Response::error('Unauthorized.', 403);
+
+        $enrollments = $this->db->prepare("SELECT id FROM enrollments WHERE class_record_id = ? AND is_active = 1");
+        $enrollments->execute([$classId]);
+        $validEnrollmentIds = array_map('intval', array_column($enrollments->fetchAll(), 'id'));
+        $validEnrollmentSet = array_flip($validEnrollmentIds);
+
+        $this->db->beginTransaction();
+        try {
+            $upsert = $this->db->prepare("
+                INSERT INTO attendance_records (enrollment_id, attendance_date, status, points, encoded_by)
+                VALUES (?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    status = VALUES(status),
+                    points = VALUES(points),
+                    encoded_by = VALUES(encoded_by),
+                    updated_at = NOW()
+            ");
+
+            $saved = 0;
+            foreach ($rows as $row) {
+                $enrollmentId = (int)($row['enrollment_id'] ?? 0);
+                $status = $row['status'] ?? 'absent';
+
+                if (!isset($validEnrollmentSet[$enrollmentId])) {
+                    continue;
+                }
+                if (!in_array($status, ['present', 'absent'], true)) {
+                    throw new InvalidArgumentException('Attendance status must be present or absent.');
+                }
+
+                $points = $status === 'present' ? 1 : 0;
+                $upsert->execute([$enrollmentId, $date, $status, $points, $auth['sub']]);
+                $saved++;
+            }
+
+            foreach ($validEnrollmentIds as $enrollmentId) {
+                $this->computeGradeInternal($enrollmentId, $auth['sub']);
+            }
+
+            if ($saved > 0) {
+                $this->db->prepare("UPDATE class_records SET grade_status = 'draft', verified_at = NULL, released_at = NULL WHERE id = ?")->execute([$classId]);
+                $this->logAudit($auth['sub'], 'SAVE_CLASS_ATTENDANCE', 'class_record', $classId, null, [
+                    'attendance_date' => $date,
+                    'saved_count' => $saved,
+                ]);
+            }
+
+            $this->db->commit();
+            Response::success([
+                'saved' => $saved,
+                'attendance_date' => $date,
+            ], 'Class attendance saved.');
+        } catch (InvalidArgumentException $e) {
+            $this->db->rollBack();
+            Response::error($e->getMessage(), 422);
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            error_log('Save class attendance error: ' . $e->getMessage());
+            Response::error('Failed to save class attendance.', 500);
         }
     }
 
@@ -318,7 +513,19 @@ class GradeController {
     }
 
     private function computeGradeInternal($enrollmentId, $encodedBy = null) {
-        $this->syncAttendanceComponent($enrollmentId, $encodedBy);
+        // Get attendance weight for this class
+        $classInfo = $this->db->prepare("
+            SELECT cr.attendance_weight
+            FROM enrollments e
+            INNER JOIN class_records cr ON e.class_record_id = cr.id
+            WHERE e.id = ?
+        ");
+        $classInfo->execute([$enrollmentId]);
+        $classData = $classInfo->fetch();
+        $attendanceWeight = $classData ? (float)($classData['attendance_weight'] ?? 100.0) : 100.0;
+        $attendanceWeight = max(0, min(100, $attendanceWeight)) / 100; // Normalize to 0-1
+
+        $this->syncAttendanceComponent($enrollmentId, $encodedBy, $attendanceWeight);
 
         $settings = $this->db->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('major_exam_weight','quiz_weight','project_weight','passing_grade','grade_scale')")->fetchAll(PDO::FETCH_KEY_PAIR);
         $examWeight = ((float)($settings['major_exam_weight'] ?? 30)) / 100;
@@ -339,8 +546,8 @@ class GradeController {
         $terms = $this->organizeComponentsByTerm($stmt->fetchAll());
         $attendanceTerms = $this->splitAttendanceRowsByTerm($this->getAttendanceRows($enrollmentId));
 
-        $midterm = $this->calculateTermStats($terms['midterm'], $attendanceTerms['midterm'], $examWeight, $quizWeight, $projWeight);
-        $final = $this->calculateTermStats($terms['final'], $attendanceTerms['final'], $examWeight, $quizWeight, $projWeight);
+        $midterm = $this->calculateTermStats($terms['midterm'], $attendanceTerms['midterm'], $examWeight, $quizWeight, $projWeight, $attendanceWeight);
+        $final = $this->calculateTermStats($terms['final'], $attendanceTerms['final'], $examWeight, $quizWeight, $projWeight, $attendanceWeight);
         $hasAny = $midterm['has_scores'] || $final['has_scores'];
 
         $examAvg = $this->averagePresentValues([$midterm['major_exam_avg'], $final['major_exam_avg']]) ?? 0;
@@ -367,8 +574,91 @@ class GradeController {
             'remarks' => $remarks,
             'midterm_average' => $midterm['weighted_score'] !== null ? round($midterm['weighted_score'], 2) : null,
             'final_average' => $final['weighted_score'] !== null ? round($final['weighted_score'], 2) : null,
-            'attendance_included' => true
+            'attendance_included' => $attendanceWeight > 0,
+            'attendance_weight' => round($attendanceWeight * 100, 2)
         ];
+    }
+
+    private function ensureClassRecordColumns() {
+        try {
+            $column = $this->db->query("SHOW COLUMNS FROM class_records LIKE 'attendance_weight'")->fetch();
+            if (!$column) {
+                $this->db->exec("ALTER TABLE class_records ADD COLUMN attendance_weight DECIMAL(5,2) DEFAULT 100.00 AFTER max_students");
+            }
+        } catch (Exception $e) {
+            error_log('Class record schema check failed: ' . $e->getMessage());
+        }
+    }
+
+    private function ensureGradeAssessmentTable() {
+        $this->db->exec("CREATE TABLE IF NOT EXISTS grade_assessments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            class_record_id INT NOT NULL,
+            category ENUM('major_exam', 'quiz', 'project') NOT NULL,
+            component_name VARCHAR(100) NOT NULL,
+            max_score DECIMAL(6,2) NOT NULL,
+            created_by INT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_record_id) REFERENCES class_records(id) ON DELETE CASCADE,
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
+            UNIQUE KEY uk_class_assessment (class_record_id, category, component_name),
+            INDEX idx_class_assessment_class (class_record_id)
+        ) ENGINE=InnoDB");
+    }
+
+    private function getClassAssessments($classId) {
+        $stmt = $this->db->prepare("SELECT id, category, component_name, max_score, created_at, updated_at FROM grade_assessments WHERE class_record_id = ? ORDER BY category, component_name");
+        $stmt->execute([$classId]);
+        return $stmt->fetchAll();
+    }
+
+    private function formatAssessmentDefinition($id, $category, $componentName, $maxScore, $clientKey = null) {
+        return [
+            'id' => (int)$id,
+            'category' => $category,
+            'component_name' => $componentName,
+            'max_score' => (float)$maxScore,
+            'client_key' => $clientKey,
+        ];
+    }
+
+    private function ensureAssessmentDefinitionForEnrollment($enrollmentId, $category, $componentName, $maxScore, $createdBy) {
+        $classId = $this->db->prepare("SELECT class_record_id FROM enrollments WHERE id = ?");
+        $classId->execute([$enrollmentId]);
+        $classRecordId = $classId->fetchColumn();
+        if (!$classRecordId || $componentName === 'Attendance') return;
+
+        $stmt = $this->db->prepare("
+            INSERT INTO grade_assessments (class_record_id, category, component_name, max_score, created_by)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE max_score = VALUES(max_score), updated_at = NOW()
+        ");
+        $stmt->execute([$classRecordId, $category, $componentName, $maxScore, $createdBy]);
+    }
+
+    private function renameClassGradeComponents($classId, $oldCategory, $oldName, $newCategory, $newName, $maxScore) {
+        $stmt = $this->db->prepare("
+            UPDATE grade_components gc
+            INNER JOIN enrollments e ON gc.enrollment_id = e.id
+            SET gc.category = ?, gc.component_name = ?, gc.max_score = ?, gc.updated_at = NOW()
+            WHERE e.class_record_id = ?
+              AND gc.category = ?
+              AND gc.component_name = ?
+        ");
+        $stmt->execute([$newCategory, $newName, $maxScore, $classId, $oldCategory, $oldName]);
+    }
+
+    private function updateClassGradeComponentMaxScore($classId, $category, $componentName, $maxScore) {
+        $stmt = $this->db->prepare("
+            UPDATE grade_components gc
+            INNER JOIN enrollments e ON gc.enrollment_id = e.id
+            SET gc.max_score = ?, gc.updated_at = NOW()
+            WHERE e.class_record_id = ?
+              AND gc.category = ?
+              AND gc.component_name = ?
+        ");
+        $stmt->execute([$maxScore, $classId, $category, $componentName]);
     }
 
     private function organizeComponentsByTerm($components) {
@@ -438,14 +728,14 @@ class GradeController {
         ];
     }
 
-    private function calculateTermStats($termComponents, $attendanceRows, $examWeight, $quizWeight, $projWeight) {
+    private function calculateTermStats($termComponents, $attendanceRows, $examWeight, $quizWeight, $projWeight, $attendanceWeight = 1.0) {
         $examAvg = $this->transmutedAverage($termComponents['major_exam'] ?? []);
         $quizAvg = $this->transmutedAverage($termComponents['quiz'] ?? []);
         $projectValues = $this->transmutedValues($termComponents['project'] ?? []);
         $attendanceValue = $this->transmutedAttendanceValue($attendanceRows);
 
-        if ($attendanceValue !== null) {
-            $projectValues[] = $attendanceValue;
+        if ($attendanceValue !== null && $attendanceWeight > 0) {
+            $projectValues[] = $attendanceValue * $attendanceWeight;
         }
 
         $projectAvg = $this->averagePresentValues($projectValues);
@@ -549,10 +839,10 @@ class GradeController {
         ];
     }
 
-    private function syncAttendanceComponent($enrollmentId, $encodedBy = null) {
+    private function syncAttendanceComponent($enrollmentId, $encodedBy = null, $attendanceWeight = 1.0) {
         $rows = $this->getAttendanceRows($enrollmentId);
         $summary = $this->buildAttendanceSummary($rows);
-        if ((int)$summary['total_sessions'] === 0) return;
+        if ((int)$summary['total_sessions'] === 0 || $attendanceWeight <= 0) return;
 
         if (!$encodedBy) {
             $owner = $this->db->prepare("SELECT cr.faculty_id FROM enrollments e INNER JOIN class_records cr ON e.class_record_id = cr.id WHERE e.id = ?");
@@ -561,16 +851,19 @@ class GradeController {
         }
         if (!$encodedBy) return;
 
+        $adjustedScore = $summary['total_points'] * $attendanceWeight;
+        $adjustedMax = $summary['possible_points'] * $attendanceWeight;
+
         $existing = $this->db->prepare("SELECT id FROM grade_components WHERE enrollment_id = ? AND category = 'project' AND component_name = 'Attendance' LIMIT 1");
         $existing->execute([$enrollmentId]);
         $componentId = $existing->fetchColumn();
 
         if ($componentId) {
             $stmt = $this->db->prepare("UPDATE grade_components SET max_score = ?, score = ?, encoded_by = ?, updated_at = NOW() WHERE id = ?");
-            $stmt->execute([$summary['possible_points'], $summary['total_points'], $encodedBy, $componentId]);
+            $stmt->execute([$adjustedMax, $adjustedScore, $encodedBy, $componentId]);
         } else {
             $stmt = $this->db->prepare("INSERT INTO grade_components (enrollment_id, category, component_name, max_score, score, encoded_by) VALUES (?, 'project', 'Attendance', ?, ?, ?)");
-            $stmt->execute([$enrollmentId, $summary['possible_points'], $summary['total_points'], $encodedBy]);
+            $stmt->execute([$enrollmentId, $adjustedMax, $adjustedScore, $encodedBy]);
         }
     }
 

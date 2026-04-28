@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS class_records (
     schedule VARCHAR(200) DEFAULT NULL COMMENT 'e.g., MWF 9:00-10:00 AM',
     room VARCHAR(50) DEFAULT NULL,
     max_students INT DEFAULT 50,
+    attendance_weight DECIMAL(5,2) DEFAULT 100.00 COMMENT 'Attendance contribution weight inside performance tasks',
     grade_status ENUM('draft', 'faculty_verified', 'officially_released') DEFAULT 'draft',
     verified_at DATETIME DEFAULT NULL,
     released_at DATETIME DEFAULT NULL,
@@ -86,6 +87,25 @@ CREATE TABLE IF NOT EXISTS class_records (
     INDEX idx_faculty (faculty_id),
     INDEX idx_semester (academic_year, semester),
     INDEX idx_status (grade_status)
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- GRADE ASSESSMENTS TABLE
+-- Class-level assessment definitions, persisted even before scores
+-- ============================================================
+CREATE TABLE IF NOT EXISTS grade_assessments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    class_record_id INT NOT NULL,
+    category ENUM('major_exam', 'quiz', 'project') NOT NULL,
+    component_name VARCHAR(100) NOT NULL COMMENT 'e.g., [Midterm] Quiz 1',
+    max_score DECIMAL(6,2) NOT NULL,
+    created_by INT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (class_record_id) REFERENCES class_records(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
+    UNIQUE KEY uk_class_assessment (class_record_id, category, component_name),
+    INDEX idx_class_assessment_class (class_record_id)
 ) ENGINE=InnoDB;
 
 -- ============================================================

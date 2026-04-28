@@ -13,6 +13,7 @@ class ClassController {
     public function __construct() {
         $database = new Database();
         $this->db = $database->getConnection();
+        $this->ensureClassRecordColumns();
     }
 
     public function index() {
@@ -80,8 +81,17 @@ class ClassController {
         if (!$stmt->fetch()) Response::error('Class record not found or unauthorized.', 404);
 
         $fields = []; $params = [];
-        foreach (['section','academic_year','semester','schedule','room','max_students'] as $f) {
-            if (array_key_exists($f, $data)) { $fields[] = "$f = ?"; $params[] = $data[$f]; }
+        foreach (['section','academic_year','semester','schedule','room','max_students','attendance_weight'] as $f) {
+            if (array_key_exists($f, $data)) {
+                if ($f === 'attendance_weight') {
+                    $value = max(0, min(100, (float)$data[$f]));
+                    $fields[] = "$f = ?";
+                    $params[] = $value;
+                } else {
+                    $fields[] = "$f = ?";
+                    $params[] = $data[$f];
+                }
+            }
         }
         if (empty($fields)) Response::error('No fields to update.', 400);
         $params[] = $id;
@@ -205,5 +215,16 @@ class ClassController {
             $stmt = $this->db->prepare("INSERT INTO audit_logs (user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([$userId, $action, $entityType, $entityId, $oldValues ? json_encode($oldValues) : null, $newValues ? json_encode($newValues) : null, $_SERVER['REMOTE_ADDR'] ?? null, $_SERVER['HTTP_USER_AGENT'] ?? null]);
         } catch (Exception $e) {}
+    }
+
+    private function ensureClassRecordColumns() {
+        try {
+            $column = $this->db->query("SHOW COLUMNS FROM class_records LIKE 'attendance_weight'")->fetch();
+            if (!$column) {
+                $this->db->exec("ALTER TABLE class_records ADD COLUMN attendance_weight DECIMAL(5,2) DEFAULT 100.00 AFTER max_students");
+            }
+        } catch (Exception $e) {
+            error_log('Class record schema check failed: ' . $e->getMessage());
+        }
     }
 }
