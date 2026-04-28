@@ -267,7 +267,13 @@ class UserController {
 
         $mailer = new Mailer($this->db);
         $recipientName = trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? ''));
-        $mailResult = $mailer->sendWelcomeCredentialsEmail($data['email'], $recipientName, $plainPassword, $data['role']);
+        $mailResult = $mailer->sendWelcomeCredentialsEmail(
+            $data['email'], 
+            $recipientName, 
+            $plainPassword, 
+            $data['role'],
+            $data['year_level'] ?? null
+        );
 
         $responseData = [
             'id' => (int)$newId,
