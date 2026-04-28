@@ -32,15 +32,16 @@ const CATEGORY_SHORT_LABELS = {
 };
 const PERIODS = ['midterm', 'final'];
 const PERIOD_LABELS = { midterm: 'Midterm', final: 'Final' };
+const TERM_GRADE_SHORT_LABELS = { midterm: 'MG', final: 'FG' };
+const CLASS_RECORD_WEIGHTS = {
+  major_exam: 0.30,
+  quiz: 0.30,
+  performance_category: 0.40, // Total for Performance Category (PT + Attendance)
+  // Performance Task Weight = 0.40 - Attendance Weight
+  // Attendance Weight is customizable by instructor
+};
 
-const DEFAULT_ASSESSMENTS = [
-  { category: 'major_exam', period: 'midterm', clean_name: 'Exam', max_score: 100 },
-  { category: 'quiz', period: 'midterm', clean_name: 'Quiz 1', max_score: 50 },
-  { category: 'project', period: 'midterm', clean_name: 'Project 1', max_score: 100 },
-  { category: 'major_exam', period: 'final', clean_name: 'Exam', max_score: 100 },
-  { category: 'quiz', period: 'final', clean_name: 'Quiz 1', max_score: 50 },
-  { category: 'project', period: 'final', clean_name: 'Project 1', max_score: 100 },
-];
+
 const AUTOSAVE_DELAY_MS = 1200;
 
 let draftAssessmentCount = 0;
@@ -110,10 +111,117 @@ function formatWeightedScore(value) {
   return Number.isFinite(numeric) ? `${numeric.toFixed(1)}%` : null;
 }
 
+function formatRecordNumber(value, digits = 0) {
+  if (value === null || value === undefined || value === '') return '--';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '--';
+  return numeric.toFixed(digits);
+}
+
+function numericScore(value) {
+  if (value === '' || value === null || value === undefined) return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function transmutedScore(score, maxScore) {
+  const numericScoreValue = numericScore(score);
+  const numericMaxScore = Number(maxScore);
+  if (numericScoreValue === null || !Number.isFinite(numericMaxScore) || numericMaxScore <= 0) {
+    return null;
+  }
+  return ((numericScoreValue / numericMaxScore) * 50) + 50;
+}
+
+function averageValues(values) {
+  const present = values.filter(value => value !== null && value !== undefined && Number.isFinite(Number(value)));
+  if (!present.length) return null;
+  return present.reduce((sum, value) => sum + Number(value), 0) / present.length;
+}
+
+function mapPercentageToGrade(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  if (numeric >= 99) return 1.00;
+  if (numeric >= 97) return 1.10;
+  if (numeric >= 95) return 1.20;
+  if (numeric >= 93) return 1.30;
+  if (numeric >= 91) return 1.40;
+  if (numeric >= 90) return 1.50;
+  if (numeric >= 89) return 1.60;
+  if (numeric >= 88) return 1.70;
+  if (numeric >= 87) return 1.80;
+  if (numeric >= 86) return 1.90;
+  if (numeric >= 85) return 2.00;
+  if (numeric >= 84) return 2.10;
+  if (numeric >= 83) return 2.20;
+  if (numeric >= 82) return 2.30;
+  if (numeric >= 81) return 2.40;
+  if (numeric >= 80) return 2.50;
+  if (numeric >= 79) return 2.60;
+  if (numeric >= 78) return 2.70;
+  if (numeric >= 77) return 2.80;
+  if (numeric >= 76) return 2.90;
+  if (numeric >= 75) return 3.00;
+  return 5.00;
+}
+
 function getFinalGradeColor(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 'var(--text-muted)';
   return numeric <= 3 ? 'var(--success)' : 'var(--danger)';
+}
+
+function splitAttendanceRowsByTerm(rows, assessmentColumns) {
+  const sortedRows = ensureArray(rows)
+    .filter(row => row.attendance_date)
+    .sort((a, b) => String(a.attendance_date).localeCompare(String(b.attendance_date)));
+  
+  if (sortedRows.length === 0) {
+    return { midterm: [], final: [] };
+  }
+  
+  const hasMidterm = assessmentColumns.some(col => col.period === 'midterm');
+  const hasFinal = assessmentColumns.some(col => col.period === 'final');
+  
+  // If only midterm assessments exist, all attendance goes to midterm
+  if (hasMidterm && !hasFinal) {
+    return { midterm: sortedRows, final: [] };
+  }
+  
+  // If only final assessments exist, all attendance goes to final
+  if (hasFinal && !hasMidterm) {
+    return { midterm: [], final: sortedRows };
+  }
+  
+  // If both periods have assessments, keep all existing attendance in midterm
+  // Faculty must explicitly add new attendance dates for final period
+  return { midterm: sortedRows, final: [] };
+}
+
+function splitAttendanceDatesByTerm(dates, assessmentColumns) {
+  const sortedDates = ensureArray(dates).filter(Boolean).sort();
+  
+  if (sortedDates.length === 0) {
+    return [];
+  }
+  
+  const hasMidterm = assessmentColumns.some(col => col.period === 'midterm');
+  const hasFinal = assessmentColumns.some(col => col.period === 'final');
+  
+  // If only midterm assessments exist, all attendance goes to midterm
+  if (hasMidterm && !hasFinal) {
+    return [{ period: 'midterm', label: 'Midterm Attendance', dates: sortedDates }].filter(group => group.dates.length > 0);
+  }
+  
+  // If only final assessments exist, all attendance goes to final
+  if (hasFinal && !hasMidterm) {
+    return [{ period: 'final', label: 'Final Attendance', dates: sortedDates }].filter(group => group.dates.length > 0);
+  }
+  
+  // If both periods have assessments, keep all existing attendance in midterm
+  // Faculty must explicitly add new attendance dates for final period
+  return [{ period: 'midterm', label: 'Midterm Attendance', dates: sortedDates }].filter(group => group.dates.length > 0);
 }
 
 function sortAssessments(columns) {
@@ -134,20 +242,36 @@ function createDraftAssessment(category = 'quiz', period = 'midterm') {
   draftAssessmentCount += 1;
   const countLabel = draftAssessmentCount;
   const baseName = category === 'major_exam' ? 'Exam' : category === 'project' ? 'Project' : 'Quiz';
+  const assessmentName = `${baseName} ${countLabel}`;
 
   return {
-    key: `draft-${Date.now()}-${countLabel}`,
+    key: assessmentKey(category, formatComponentName(period, assessmentName)),
     category,
     period,
-    clean_name: `${baseName} ${countLabel}`,
+    clean_name: assessmentName,
     max_score: category === 'quiz' ? 50 : 100,
+    isDraft: true,
   };
 }
 
-function buildGradebookState(students) {
+function buildGradebookState(students, classAssessments = []) {
   const columnMap = new Map();
   const scoreMatrix = {};
   const componentIdsByEnrollment = {};
+
+  ensureArray(classAssessments).forEach(assessment => {
+    if (!assessment?.category || !assessment?.component_name) return;
+    const key = assessmentKey(assessment.category, assessment.component_name);
+    const parsed = parseComponent(assessment.component_name);
+    columnMap.set(key, {
+      key,
+      assessment_id: assessment.id,
+      category: assessment.category,
+      period: parsed.period,
+      clean_name: parsed.cleanName,
+      max_score: Number(assessment.max_score) || 0,
+    });
+  });
 
   students.forEach(student => {
     const enrollmentId = student.enrollment_id;
@@ -164,6 +288,7 @@ function buildGradebookState(students) {
         if (!columnMap.has(key)) {
           columnMap.set(key, {
             key,
+            assessment_id: component.assessment_id,
             category: component.category,
             period: parsed.period,
             clean_name: parsed.cleanName,
@@ -172,6 +297,9 @@ function buildGradebookState(students) {
         } else {
           const existing = columnMap.get(key);
           existing.max_score = Math.max(Number(existing.max_score) || 0, maxScore);
+          if (!existing.assessment_id && component.assessment_id) {
+            existing.assessment_id = component.assessment_id;
+          }
         }
 
         componentIdsByEnrollment[enrollmentId][key] = component.id;
@@ -179,14 +307,7 @@ function buildGradebookState(students) {
       });
   });
 
-  let assessments = sortAssessments(Array.from(columnMap.values()));
-
-  if (!assessments.length) {
-    assessments = DEFAULT_ASSESSMENTS.map(component => ({
-      ...component,
-      key: assessmentKey(component.category, formatComponentName(component.period, component.clean_name)),
-    }));
-  }
+  const assessments = sortAssessments(Array.from(columnMap.values()));
 
   students.forEach(student => {
     assessments.forEach(column => {
@@ -219,6 +340,8 @@ export default function GradeBook() {
   const [scoreMatrix, setScoreMatrix] = useState({});
   const [componentIdsByEnrollment, setComponentIdsByEnrollment] = useState({});
   const [deletedComponentIdsByEnrollment, setDeletedComponentIdsByEnrollment] = useState({});
+  const [deletedAssessmentIds, setDeletedAssessmentIds] = useState([]);
+  const [hasAssessmentDefinitionChanges, setHasAssessmentDefinitionChanges] = useState(false);
   const [availableStudents, setAvailableStudents] = useState([]);
   const [showEnroll, setShowEnroll] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
@@ -226,8 +349,10 @@ export default function GradeBook() {
   const [showAttendance, setShowAttendance] = useState(null);
   const [showDailyAttendance, setShowDailyAttendance] = useState(false);
   const [dailyAttendanceDate, setDailyAttendanceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [dailyAttendancePeriod, setDailyAttendancePeriod] = useState('midterm');
   const [dailyAttendanceMap, setDailyAttendanceMap] = useState({});
   const [savingDailyAttendance, setSavingDailyAttendance] = useState(false);
+  const [deletingAttendanceDate, setDeletingAttendanceDate] = useState(null);
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [deletedAttendanceIds, setDeletedAttendanceIds] = useState([]);
@@ -239,6 +364,10 @@ export default function GradeBook() {
   const [saveStatus, setSaveStatus] = useState('saved');
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [toast, setToast] = useState(null);
+  const [attendanceWeight, setAttendanceWeight] = useState(5);
+  const [showAttendanceSettings, setShowAttendanceSettings] = useState(false);
+  const [savingAttendanceWeight, setSavingAttendanceWeight] = useState(false);
+  const [termGradesUnlocked, setTermGradesUnlocked] = useState(false);
   const autosaveTimerRef = useRef(null);
   const saveVersionRef = useRef(0);
 
@@ -262,15 +391,21 @@ export default function GradeBook() {
         api.get(`/classes/${classId}`),
         api.get(`/grades/class/${classId}`),
       ]);
-      const students = ensureArray(gradesResponse.data?.data).map(normalizeGradeStudent);
-      const gradebookState = buildGradebookState(students);
+      const gradePayload = gradesResponse.data?.data;
+      const students = ensureArray(Array.isArray(gradePayload) ? gradePayload : gradePayload?.students).map(normalizeGradeStudent);
+      const gradebookState = buildGradebookState(students, Array.isArray(gradePayload) ? [] : gradePayload?.assessments);
+      const fetchedClassData = classResponse.data?.data || null;
 
-      setClassData(classResponse.data?.data || null);
+      setClassData(fetchedClassData);
+      setAttendanceWeight(fetchedClassData?.attendance_weight ?? 5);
+      setTermGradesUnlocked(previous => previous || fetchedClassData?.grade_status !== 'draft');
       setGrades(students);
       setAssessmentColumns(gradebookState.assessments);
       setScoreMatrix(gradebookState.scoreMatrix);
       setComponentIdsByEnrollment(gradebookState.componentIdsByEnrollment);
       setDeletedComponentIdsByEnrollment({});
+      setDeletedAssessmentIds([]);
+      setHasAssessmentDefinitionChanges(false);
       setHasUnsavedChanges(false);
       setSaveStatus('saved');
       setLastSavedAt(null);
@@ -283,6 +418,8 @@ export default function GradeBook() {
       setScoreMatrix({});
       setComponentIdsByEnrollment({});
       setDeletedComponentIdsByEnrollment({});
+      setDeletedAssessmentIds([]);
+      setHasAssessmentDefinitionChanges(false);
       setLoadError(message);
       showToast(message, 'error');
     } finally {
@@ -303,6 +440,7 @@ export default function GradeBook() {
     });
     return Array.from(dates).sort();
   }, [grades]);
+  const attendanceDateGroups = useMemo(() => splitAttendanceDatesByTerm(attendanceDates, assessmentColumns), [attendanceDates, assessmentColumns]);
 
   const groupedAssessments = useMemo(() => {
     const groups = [];
@@ -383,6 +521,14 @@ export default function GradeBook() {
 
   const addAssessment = (category, period = 'midterm') => {
     const newColumn = createDraftAssessment(category, period);
+
+    // Check if assessment with same key already exists
+    const existingColumn = assessmentColumns.find(col => col.key === newColumn.key);
+    if (existingColumn) {
+      showToast('An assessment with this name already exists in this period.', 'error');
+      return;
+    }
+
     setAssessmentColumns(columns => sortAssessments([...columns, newColumn]));
     setScoreMatrix(matrix => {
       const next = { ...matrix };
@@ -394,6 +540,7 @@ export default function GradeBook() {
       });
       return next;
     });
+    setHasAssessmentDefinitionChanges(true);
     markGradebookDirty();
   };
 
@@ -404,6 +551,7 @@ export default function GradeBook() {
       ));
       return field === 'category' || field === 'period' || field === 'clean_name' ? sortAssessments(next) : next;
     });
+    setHasAssessmentDefinitionChanges(true);
     markGradebookDirty();
   };
 
@@ -430,6 +578,10 @@ export default function GradeBook() {
       });
       return next;
     });
+    if (column.assessment_id) {
+      setDeletedAssessmentIds(ids => ids.includes(column.assessment_id) ? ids : [...ids, column.assessment_id]);
+    }
+    setHasAssessmentDefinitionChanges(true);
 
     setAssessmentColumns(columns => columns.filter(item => item.key !== columnKey));
     setScoreMatrix(matrix => {
@@ -453,28 +605,40 @@ export default function GradeBook() {
 
   const validateGradebook = () => {
     if (!grades.length) {
-      return { valid: false, message: 'Enroll students before saving scores.' };
+      if (!assessmentColumns.length) {
+        return { valid: true, columns: [] };
+      }
     }
 
     if (!assessmentColumns.length) {
-      return { valid: false, message: 'Add at least one quiz, exam, or project.' };
+      return { valid: true, columns: [] };
     }
 
     const normalizedColumns = assessmentColumns.map(column => ({
       ...column,
       clean_name: String(column.clean_name || '').trim(),
-      max_score: Number(column.max_score),
+      max_score: Number(column.max_score) || 0,
     }));
 
-    if (normalizedColumns.some(column => !column.clean_name)) {
+    const columnsToValidate = normalizedColumns.filter(column => {
+      const hasScore = grades.some(student => {
+        const value = scoreMatrix[student.enrollment_id]?.[column.key];
+        return value !== '' && value !== null && value !== undefined;
+      });
+      return hasScore || column.isDraft || column.assessment_id || !grades.length;
+    });
+
+    if (columnsToValidate.some(column => !column.clean_name)) {
       return { valid: false, message: 'Every assessment needs a name.' };
     }
 
-    if (normalizedColumns.some(column => !Number.isFinite(column.max_score) || column.max_score <= 0)) {
+    if (columnsToValidate.some(column => !Number.isFinite(column.max_score) || column.max_score <= 0)) {
       return { valid: false, message: 'Every assessment needs a max score greater than 0.' };
     }
 
-    const identities = normalizedColumns.map(column => assessmentKey(column.category, formatComponentName(column.period, column.clean_name)));
+    const identities = columnsToValidate.map(column =>
+      assessmentKey(column.category, formatComponentName(column.period, column.clean_name))
+    );
     if (new Set(identities).size !== identities.length) {
       return { valid: false, message: 'Assessment names must be unique inside each category.' };
     }
@@ -484,6 +648,34 @@ export default function GradeBook() {
     }
 
     return { valid: true, columns: normalizedColumns };
+  };
+
+  const saveAssessmentDefinitions = async (columns) => {
+    const payload = columns.map(column => ({
+      id: column.assessment_id,
+      client_key: column.key,
+      category: column.category,
+      component_name: formatComponentName(column.period, column.clean_name),
+      max_score: column.max_score,
+    }));
+
+    const response = await api.put(`/grades/class/${classId}/assessments`, {
+      assessments: payload,
+      delete_ids: deletedAssessmentIds,
+    });
+
+    const savedByClientKey = new Map(
+      ensureArray(response.data?.data?.assessments).map(item => [item.client_key, item])
+    );
+
+    setAssessmentColumns(current => current.map(column => {
+      const saved = savedByClientKey.get(column.key);
+      return saved?.id
+        ? { ...column, assessment_id: saved.id, isDraft: false }
+        : { ...column, isDraft: false };
+    }));
+    setDeletedAssessmentIds([]);
+    setHasAssessmentDefinitionChanges(false);
   };
 
   const saveScoreGrid = async ({ silent = false } = {}) => {
@@ -501,61 +693,116 @@ export default function GradeBook() {
     try {
       let changedCount = 0;
       let statusReset = false;
+      const hadAssessmentChanges = hasAssessmentDefinitionChanges || deletedAssessmentIds.length > 0;
       const nextComponentIds = {};
       const gradeUpdates = new Map();
+      const errors = [];
+
+      if (validation.columns.length || deletedAssessmentIds.length) {
+        await saveAssessmentDefinitions(validation.columns);
+      }
+
+      if (!grades.length) {
+        if (saveVersionRef.current === versionAtStart) {
+          setHasUnsavedChanges(false);
+          setSaveStatus('saved');
+        } else {
+          setSaveStatus('pending');
+        }
+        setLastSavedAt(new Date());
+        if (!silent) showToast(hadAssessmentChanges ? 'Assessments saved successfully.' : 'No changes detected.');
+        return true;
+      }
 
       await Promise.all(grades.map(async student => {
         const enrollmentId = student.enrollment_id;
-        const components = validation.columns.map(column => {
-          const componentId = componentIdsByEnrollment[enrollmentId]?.[column.key];
-          const scoreValue = scoreMatrix[enrollmentId]?.[column.key];
-          const payload = {
-            category: column.category,
-            component_name: formatComponentName(column.period, column.clean_name),
-            max_score: column.max_score,
-            score: scoreValue === '' || scoreValue === null || scoreValue === undefined
-              ? null
-              : Number(scoreValue),
-          };
 
-          if (componentId) payload.id = componentId;
-          return payload;
-        });
+        // Only include components that have data (scores or are being created)
+        const components = validation.columns
+          .filter(column => {
+            const scoreValue = scoreMatrix[enrollmentId]?.[column.key];
+            const hasScore = scoreValue !== '' && scoreValue !== null && scoreValue !== undefined;
+            const hasId = componentIdsByEnrollment[enrollmentId]?.[column.key];
+            return hasScore || hasId || column.isDraft;
+          })
+          .map(column => {
+            const componentId = componentIdsByEnrollment[enrollmentId]?.[column.key];
+            const scoreValue = scoreMatrix[enrollmentId]?.[column.key];
+            const payload = {
+              category: column.category,
+              component_name: formatComponentName(column.period, column.clean_name),
+              max_score: column.max_score || 0,
+              score: scoreValue === '' || scoreValue === null || scoreValue === undefined
+                ? null
+                : Number(scoreValue),
+              force_create: column.isDraft && !componentId, // Force creation for new draft assessments
+            };
 
-        const response = await api.post('/grades/encode', {
-          enrollment_id: enrollmentId,
-          delete_ids: deletedComponentIdsByEnrollment[enrollmentId] || [],
-          components,
-        });
+            if (componentId) payload.id = componentId;
+            return payload;
+          });
 
-        const responseData = response.data?.data || {};
-        const savedComponents = responseData.components || [];
-        const returnedComponents = new Map(
-          savedComponents
-            .filter(component => component.component_name !== 'Attendance')
-            .map(component => [assessmentKey(component.category, component.component_name), component])
-        );
+        try {
+          const response = await api.post('/grades/encode', {
+            enrollment_id: enrollmentId,
+            delete_ids: deletedComponentIdsByEnrollment[enrollmentId] || [],
+            components,
+          });
 
-        nextComponentIds[enrollmentId] = {};
-        validation.columns.forEach(column => {
-          const expectedKey = assessmentKey(column.category, formatComponentName(column.period, column.clean_name));
-          const returnedComponent = returnedComponents.get(expectedKey);
-          if (returnedComponent?.id) {
-            nextComponentIds[enrollmentId][column.key] = returnedComponent.id;
-          }
-        });
+          const responseData = response.data?.data || {};
+          const savedComponents = responseData.components || [];
+          const returnedComponents = new Map(
+            savedComponents
+              .filter(component => component.component_name !== 'Attendance')
+              .map(component => [assessmentKey(component.category, component.component_name), component])
+          );
 
-        gradeUpdates.set(enrollmentId, {
-          components: savedComponents,
-          grade: responseData.grade,
-        });
+          nextComponentIds[enrollmentId] = { ...(componentIdsByEnrollment[enrollmentId] || {}) };
+          validation.columns.forEach(column => {
+            const expectedKey = assessmentKey(column.category, formatComponentName(column.period, column.clean_name));
+            const returnedComponent = returnedComponents.get(expectedKey);
+            if (returnedComponent?.id) {
+              nextComponentIds[enrollmentId][column.key] = returnedComponent.id;
+            }
+          });
 
-        if (responseData.changed) changedCount += 1;
-        if (responseData.status_reset) statusReset = true;
+          gradeUpdates.set(enrollmentId, {
+            components: savedComponents,
+            grade: responseData.grade,
+          });
+
+          if (responseData.changed) changedCount += 1;
+          if (responseData.status_reset) statusReset = true;
+        } catch (error) {
+          const studentName = `${student.last_name}, ${student.first_name}`;
+          const errorMsg = error.response?.data?.message || error.message || 'Unknown error';
+          errors.push({ student: studentName, error: errorMsg });
+          console.error(`Failed to save scores for ${studentName}:`, {
+            error: errorMsg,
+            fullError: error,
+            response: error.response?.data
+          });
+        }
       }));
 
-      setComponentIdsByEnrollment(previous => ({ ...previous, ...nextComponentIds }));
+      if (errors.length > 0) {
+        setSaveStatus('error');
+        if (!silent) {
+          console.error('Save errors:', errors);
+          const errorDetails = errors.map(e => `${e.student}: ${e.error}`).join('\n');
+          showToast(`Failed to save for ${errors.length} student(s). See console.`, 'error');
+        }
+        return false;
+      }
+
+      setComponentIdsByEnrollment(nextComponentIds);
       setDeletedComponentIdsByEnrollment({});
+
+      // Update assessment columns to remove draft status
+      setAssessmentColumns(columns =>
+        columns.map(column => ({ ...column, isDraft: false }))
+      );
+
       setGrades(previous => previous.map(student => {
         const update = gradeUpdates.get(student.enrollment_id);
         if (!update) return student;
@@ -585,17 +832,31 @@ export default function GradeBook() {
       setLastSavedAt(new Date());
 
       if (!silent) {
-        showToast(
-          changedCount
-            ? (statusReset ? 'Scores saved. Final marks stay hidden until the class is verified again.' : 'Scores saved successfully.')
-            : 'No score changes detected.'
-        );
+        const hasNewAssessments = hadAssessmentChanges;
+        const hasScoreChanges = changedCount > 0;
+
+        let message = hasNewAssessments ? 'Assessments saved successfully.' : 'No changes detected.';
+        if (changedCount > 0 || hasNewAssessments) {
+          if (statusReset) {
+            message = 'Changes saved. Final marks stay hidden until the class is verified again.';
+          } else if (hasNewAssessments && hasScoreChanges) {
+            message = 'Assessments created and scores saved successfully.';
+          } else if (hasNewAssessments) {
+            message = 'Assessments created successfully.';
+          } else {
+            message = 'Scores saved successfully.';
+          }
+        }
+
+        showToast(message);
       }
 
       return true;
     } catch (error) {
       setSaveStatus('error');
-      if (!silent) showToast(error.response?.data?.message || 'Failed to save score grid.', 'error');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to save score grid.';
+      console.error('Save score grid error:', error);
+      if (!silent) showToast(errorMessage, 'error');
       return false;
     } finally {
       setSavingScores(false);
@@ -606,10 +867,23 @@ export default function GradeBook() {
     window.clearTimeout(autosaveTimerRef.current);
 
     if (!hasUnsavedChanges || savingScores) return undefined;
-    if (!grades.length || !assessmentColumns.length) return undefined;
+    if (!grades.length) return undefined;
 
+    // Don't autosave if there are validation errors, but allow manual save
     if (invalidScoreCount > 0) {
       setSaveStatus('error');
+      return undefined;
+    }
+
+    // Check if we have any assessments with scores or definition changes that need to be saved
+    const hasScoresToSave = assessmentColumns.some(column => {
+      return grades.some(student => {
+        const value = scoreMatrix[student.enrollment_id]?.[column.key];
+        return value !== '' && value !== null && value !== undefined;
+      }) || column.isDraft || hasAssessmentDefinitionChanges;
+    }) || deletedAssessmentIds.length > 0;
+
+    if (!hasScoresToSave) {
       return undefined;
     }
 
@@ -624,6 +898,8 @@ export default function GradeBook() {
     scoreMatrix,
     assessmentColumns,
     deletedComponentIdsByEnrollment,
+    deletedAssessmentIds,
+    hasAssessmentDefinitionChanges,
     invalidScoreCount,
     grades.length,
   ]);
@@ -680,6 +956,8 @@ export default function GradeBook() {
   const openDailyAttendance = () => {
     const today = new Date().toISOString().slice(0, 10);
     setDailyAttendanceDate(today);
+    // Auto-select period based on active tab, default to midterm
+    setDailyAttendancePeriod(activeTab === 'final' ? 'final' : 'midterm');
     loadDailyAttendance(today);
     setShowDailyAttendance(true);
   };
@@ -690,35 +968,114 @@ export default function GradeBook() {
     }
   }, [dailyAttendanceDate, showDailyAttendance]);
 
+  const markAllDailyAttendance = (status) => {
+    const map = {};
+    grades.forEach(student => {
+      map[student.enrollment_id] = status;
+    });
+    setDailyAttendanceMap(map);
+  };
+
+  const dailyAttendanceStats = useMemo(() => {
+    const total = grades.length;
+    const present = grades.filter(student => dailyAttendanceMap[student.enrollment_id] === 'present').length;
+    const absent = grades.filter(student => dailyAttendanceMap[student.enrollment_id] === 'absent').length;
+    const unmarked = Math.max(0, total - present - absent);
+    return { total, present, absent, unmarked };
+  }, [dailyAttendanceMap, grades]);
+
   const saveDailyAttendance = async () => {
     if (!dailyAttendanceDate) return showToast('Please select a date', 'error');
-    
+    if (!dailyAttendancePeriod) return showToast('Please select a period (Midterm or Final)', 'error');
+
+    // Check if this date already exists in attendance records
+    const existingDate = attendanceDates.find(date => date === dailyAttendanceDate);
+    if (existingDate) {
+      // Check which period this date belongs to
+      const existingPeriodGroup = attendanceDateGroups.find(group => 
+        group.dates.includes(dailyAttendanceDate)
+      );
+      
+      if (existingPeriodGroup && existingPeriodGroup.period !== dailyAttendancePeriod) {
+        showToast(
+          `This date is already assigned to ${existingPeriodGroup.period === 'midterm' ? 'Midterm' : 'Final'}. Please delete it first or choose a different date.`,
+          'error'
+        );
+        return;
+      }
+    }
+
     setSavingDailyAttendance(true);
     try {
-      await Promise.all(grades.map(student => {
-        const enrollmentId = student.enrollment_id;
-        const status = dailyAttendanceMap[enrollmentId] || 'absent';
-        
-        return api.post('/grades/attendance', {
-          enrollment_id: enrollmentId,
-          attendance: [{ attendance_date: dailyAttendanceDate, status }],
-          delete_ids: []
-        });
-      }));
-      
-      showToast('Class attendance saved successfully.');
+      await api.post('/grades/attendance/class', {
+        class_id: classId,
+        attendance_date: dailyAttendanceDate,
+        period: dailyAttendancePeriod,
+        attendance: grades.map(student => ({
+          enrollment_id: student.enrollment_id,
+          status: dailyAttendanceMap[student.enrollment_id] || 'absent',
+        })),
+      });
+
+      showToast(`${dailyAttendancePeriod === 'midterm' ? 'Midterm' : 'Final'} attendance saved for ${grades.length} student(s).`);
       setShowDailyAttendance(false);
       fetchData();
     } catch (error) {
-      showToast('Failed to save attendance for some students.', 'error');
+      showToast(error.response?.data?.message || 'Failed to save class attendance.', 'error');
     } finally {
       setSavingDailyAttendance(false);
+    }
+  };
+
+  const deleteAttendanceDate = async (date) => {
+    if (!window.confirm(`Delete all attendance records for ${formatAttendanceDateLabel(date)}?\n\nThis will remove attendance for all ${grades.length} student(s) on this date.`)) {
+      return;
+    }
+
+    setDeletingAttendanceDate(date);
+    try {
+      // Collect all attendance IDs for this date from all students
+      const attendanceIdsToDelete = [];
+      grades.forEach(student => {
+        const record = ensureArray(student.attendance).find(r => r.attendance_date === date);
+        if (record?.id) {
+          attendanceIdsToDelete.push(record.id);
+        }
+      });
+
+      if (attendanceIdsToDelete.length === 0) {
+        showToast('No attendance records found for this date.', 'error');
+        return;
+      }
+
+      // Delete attendance records via API
+      await Promise.all(
+        grades.map(student => {
+          const record = ensureArray(student.attendance).find(r => r.attendance_date === date);
+          if (record?.id) {
+            return api.post('/grades/attendance', {
+              enrollment_id: student.enrollment_id,
+              attendance: [],
+              delete_ids: [record.id],
+            });
+          }
+          return Promise.resolve();
+        })
+      );
+
+      showToast(`Attendance for ${formatAttendanceDateLabel(date)} deleted successfully.`);
+      fetchData();
+    } catch (error) {
+      showToast(error.response?.data?.message || 'Failed to delete attendance date.', 'error');
+    } finally {
+      setDeletingAttendanceDate(null);
     }
   };
 
   const computeAll = async () => {
     try {
       await api.post(`/grades/compute-class/${classId}`);
+      setTermGradesUnlocked(true);
       showToast('All grades computed.');
       fetchData();
     } catch (error) {
@@ -784,10 +1141,37 @@ export default function GradeBook() {
   const updateStatus = async (status) => {
     try {
       await api.put(`/classes/${classId}/status`, { grade_status: status });
+      if (status === 'faculty_verified' || status === 'officially_released') {
+        setTermGradesUnlocked(true);
+      } else if (status === 'draft') {
+        setTermGradesUnlocked(false);
+      }
       showToast(`Status: ${status.replace('_', ' ')}`);
       fetchData();
     } catch (error) {
       showToast(error.response?.data?.message || 'Error', 'error');
+    }
+  };
+
+  const saveAttendanceWeight = async () => {
+    setSavingAttendanceWeight(true);
+    try {
+      await api.put(`/classes/${classId}`, { attendance_weight: attendanceWeight });
+      await api.post(`/grades/compute-class/${classId}`);
+      
+      // Update only the class data and grades without full reload
+      const gradesResponse = await api.get(`/grades/class/${classId}`);
+      const gradePayload = gradesResponse.data?.data;
+      const students = ensureArray(Array.isArray(gradePayload) ? gradePayload : gradePayload?.students).map(normalizeGradeStudent);
+      
+      setGrades(students);
+      setClassData(prev => prev ? { ...prev, attendance_weight: attendanceWeight } : prev);
+      setShowAttendanceSettings(false);
+      showToast('Attendance weight updated successfully.');
+    } catch (error) {
+      showToast(error.response?.data?.message || 'Failed to update attendance weight.', 'error');
+    } finally {
+      setSavingAttendanceWeight(false);
     }
   };
 
@@ -800,7 +1184,7 @@ export default function GradeBook() {
 
   const visiblePeriods = activeTab === 'summary' ? [] : [activeTab];
   const visibleColumns = assessmentColumns.filter(c => visiblePeriods.includes(c.period));
-  
+
   const visibleGroupedAssessments = useMemo(() => {
     const groups = [];
     visiblePeriods.forEach(period => {
@@ -820,6 +1204,89 @@ export default function GradeBook() {
   }, [visibleColumns, visiblePeriods]);
 
   const showSummaryCols = activeTab === 'summary';
+  const visibleColumnsByCategory = useMemo(() => ({
+    major_exam: visibleColumns.filter(column => column.category === 'major_exam'),
+    quiz: visibleColumns.filter(column => column.category === 'quiz'),
+    project: visibleColumns.filter(column => column.category === 'project'),
+  }), [visibleColumns]);
+  const termRecordColumnCount = 2
+    + visibleColumnsByCategory.project.length + 1
+    + visibleColumnsByCategory.quiz.length + 1
+    + visibleColumnsByCategory.major_exam.length + 1
+    + 6;
+
+  const shouldShowTermGrade = Boolean(classData && (classData.grade_status !== 'draft' || termGradesUnlocked));
+
+  const calculateTermRecord = (student, period) => {
+    const periodColumns = assessmentColumns.filter(column => column.period === period);
+    const scoreFor = column => scoreMatrix[student.enrollment_id]?.[column.key];
+    const categoryAverage = category => averageValues(
+      periodColumns
+        .filter(column => column.category === category)
+        .map(column => transmutedScore(scoreFor(column), column.max_score))
+    );
+
+    // Calculate attendance using the formula: 50 + (Attendance Count / Total Meetings) × 50
+    const attendanceRows = splitAttendanceRowsByTerm(student.attendance, assessmentColumns)[period] || [];
+    const totalMeetings = attendanceRows.length;
+    const attendanceCount = attendanceRows.filter(row => row.status === 'present').length;
+    const attendanceGrade = totalMeetings > 0
+      ? 50 + (attendanceCount / totalMeetings) * 50
+      : null;
+
+    const examAverage = categoryAverage('major_exam');
+    const quizAverage = categoryAverage('quiz');
+    const projectAverage = categoryAverage('project');
+    
+    // Calculate the custom attendance weight as a decimal (e.g., 5% = 0.05, 2% = 0.02)
+    const customAttendanceWeight = Number(attendanceWeight) / 100;
+    
+    // Performance Task Weight = 40% - Attendance Weight
+    const performanceTaskWeight = CLASS_RECORD_WEIGHTS.performance_category - customAttendanceWeight;
+    
+    // Apply fixed weights for exam and quiz
+    const examContribution = examAverage !== null ? examAverage * CLASS_RECORD_WEIGHTS.major_exam : null;
+    const quizContribution = quizAverage !== null ? quizAverage * CLASS_RECORD_WEIGHTS.quiz : null;
+    
+    // Apply dynamic performance task weight (40% - attendance weight)
+    const projectContribution = projectAverage !== null ? projectAverage * performanceTaskWeight : null;
+    
+    // Apply custom attendance weight (part of the 40% Performance Category)
+    let attendanceContribution = null;
+    if (attendanceGrade !== null && customAttendanceWeight > 0) {
+      attendanceContribution = attendanceGrade * customAttendanceWeight;
+    } else if (totalMeetings > 0 && customAttendanceWeight === 0) {
+      // If attendance exists but weight is 0, show 0 instead of null
+      attendanceContribution = 0;
+    }
+    
+    // Calculate weighted score by summing all contributions
+    const weightedScore = averageValues([
+      examContribution,
+      quizContribution,
+      projectContribution,
+      attendanceContribution,
+    ]) === null
+      ? null
+      : [examContribution, quizContribution, projectContribution, attendanceContribution]
+        .reduce((sum, value) => sum + (value ?? 0), 0);
+
+    return {
+      attendanceMeetings: totalMeetings,
+      attendanceCount,
+      attendanceGrade,
+      examAverage,
+      quizAverage,
+      projectAverage,
+      performanceTaskWeight, // Dynamic weight
+      examContribution,
+      quizContribution,
+      projectContribution,
+      attendanceContribution,
+      weightedScore,
+      termGrade: mapPercentageToGrade(weightedScore),
+    };
+  };
 
   if (isLoading) {
     return <div className="empty-state">Loading class record...</div>;
@@ -905,20 +1372,49 @@ export default function GradeBook() {
             <span aria-hidden="true" />
             <strong>{saveStatusLabel}</strong>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => saveScoreGrid()} disabled={savingScores || invalidScoreCount > 0 || !grades.length}>
+          <button className="btn btn-primary btn-sm" onClick={() => saveScoreGrid()} disabled={savingScores || invalidScoreCount > 0}>
             {savingScores ? <span className="spinner" /> : <Save size={14} />}
             {savingScores ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
 
-      <div className="gradebook-attendance-credit" role="status" aria-live="polite">
-        <Info size={18} aria-hidden="true" />
-        <div>
-          <strong>Attendance is credited under Performance Tasks.</strong>
-          <span>Present marks are converted with the same 0=50 transmutation and included in the 40% performance category.</span>
+      {!grades.length && (
+        <div style={{ padding: '1rem', background: 'var(--accent-muted)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Info size={20} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Getting Started</strong>
+            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Click "Enroll" to add students, then "Assessments" to create quizzes, exams, and projects.</span>
+          </div>
         </div>
-      </div>
+      )}
+
+      {grades.length > 0 && !assessmentColumns.length && (
+        <div style={{ padding: '1rem', background: 'var(--accent-muted)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Info size={20} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Setup Assessments</strong>
+            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>You have {grades.length} student(s) enrolled. Click "Assessments" to add quizzes, exams, or performance tasks.</span>
+          </div>
+        </div>
+      )}
+
+      {grades.length > 0 && assessmentColumns.length > 0 && (
+        <div className="gradebook-attendance-credit" role="status" aria-live="polite">
+          <Info size={18} aria-hidden="true" />
+          <div style={{ flex: 1 }}>
+            <strong>Performance Category (40%) = Performance Task ({40 - attendanceWeight}%) + Attendance ({attendanceWeight}%)</strong>
+            <span>Formula: (30% Quiz) + (30% Exam) + ({40 - attendanceWeight}% PT) + ({attendanceWeight}% Attendance) = 100%. Attendance Grade = 50 + (Present / Total) × 50</span>
+          </div>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setShowAttendanceSettings(true)}
+            style={{ flexShrink: 0, marginLeft: '0.5rem' }}
+          >
+            Customize
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
         <button className={`btn btn-sm ${activeTab === 'midterm' ? 'btn-primary' : 'btn-ghost'}`} style={{ flex: 1, padding: '0.6rem', fontWeight: 600, border: activeTab !== 'midterm' ? '1px solid var(--border)' : 'none' }} onClick={() => setActiveTab('midterm')}>Midterm Record</button>
@@ -927,104 +1423,218 @@ export default function GradeBook() {
       </div>
 
       <div className="table-container gradebook-table-container">
-        <table className="gradebook-table" style={{ minWidth: `${300 + (visibleColumns.length * 132) + (showSummaryCols ? attendanceDates.length * 70 + 320 : 0)}px` }}>
+        {!visibleColumns.length && grades.length > 0 && activeTab !== 'summary' ? (
+          <div className="empty-state" style={{ padding: '3rem', textAlign: 'center' }}>
+            <ClipboardCheck size={48} style={{ color: 'var(--text-muted)', marginBottom: '1rem' }} />
+            <h3 style={{ marginBottom: '0.5rem' }}>No Assessments Available</h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Add assessments now to start encoding {PERIOD_LABELS[activeTab]} scores.</p>
+            <button className="btn btn-primary" onClick={() => setShowSetup(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ClipboardCheck size={16} /> Add Assessment Now
+            </button>
+          </div>
+        ) : !assessmentColumns.length && grades.length > 0 && activeTab !== 'summary' ? (
+          <div className="empty-state" style={{ padding: '3rem', textAlign: 'center' }}>
+            <ClipboardCheck size={48} style={{ color: 'var(--text-muted)', marginBottom: '1rem' }} />
+            <h3 style={{ marginBottom: '0.5rem' }}>No Assessments Available</h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Add assessments now to start building this class record.</p>
+            <button className="btn btn-primary" onClick={() => setShowSetup(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ClipboardCheck size={16} /> Add Assessment Now
+            </button>
+          </div>
+        ) : (
+        <table className="gradebook-table gradebook-record-table" style={{ minWidth: `${showSummaryCols ? 300 + (visibleColumns.length * 132) + attendanceDates.length * 70 + 320 : 260 + (termRecordColumnCount * 82)}px` }}>
           <thead>
-            <tr className="gradebook-group-row">
-              <th rowSpan={3} className="gradebook-student-col">Student</th>
-              {visiblePeriods.map(period => {
-                const colsCount = visibleColumns.filter(c => c.period === period).length;
-                if (colsCount === 0) return null;
-                return (
-                  <th key={period} colSpan={colsCount} className="gradebook-period-header" style={{ textAlign: 'center', backgroundColor: 'var(--bg-elevated)', padding: '0.4rem', borderBottom: '1px solid var(--border)' }}>
-                    {PERIOD_LABELS[period]}
+            {!showSummaryCols ? (
+              <>
+                <tr className="gradebook-group-row">
+                  <th rowSpan={3} className="gradebook-student-col">Student</th>
+                  <th colSpan={termRecordColumnCount} className="gradebook-period-header gradebook-record-term">
+                    {PERIOD_LABELS[activeTab]}
                   </th>
-                );
-              })}
-              {showSummaryCols && attendanceDates.length > 0 && (
-                <th colSpan={attendanceDates.length} className="gradebook-period-header" style={{ textAlign: 'center', backgroundColor: 'var(--bg-elevated)', padding: '0.4rem', borderBottom: '1px solid var(--border)' }}>
-                  ATTENDANCE
-                </th>
-              )}
-              {showSummaryCols && (
-                <>
-                  <th rowSpan={3} style={{ textAlign: 'center', verticalAlign: 'middle', padding: '0 1rem' }}>Weighted</th>
-                  <th rowSpan={3} style={{ textAlign: 'center', verticalAlign: 'middle', padding: '0 1rem' }}>Grade</th>
-                  <th rowSpan={3} style={{ textAlign: 'center', verticalAlign: 'middle', padding: '0 1rem' }}>Remarks</th>
-                </>
-              )}
-            </tr>
-            <tr className="gradebook-group-row">
-              {visibleGroupedAssessments.map(group => (
-                <th key={group.id} colSpan={group.columns.length} className={`gradebook-category gradebook-category-${group.category}`}>
-                  {CATEGORY_LABELS[group.category]}
-                </th>
-              ))}
-              {showSummaryCols && attendanceDates.length > 0 && (
-                <th colSpan={attendanceDates.length} className="gradebook-category gradebook-category-project" style={{ textAlign: 'center' }}>
-                  DAILY
-                </th>
-              )}
-            </tr>
-            <tr>
-              {visibleColumns.map(column => (
-                <th key={column.key} className="gradebook-assessment-header">
-                  <div className="gradebook-assessment-title">
-                    <span>{column.clean_name || 'Untitled'}</span>
-                    <button type="button" className="gradebook-remove-assessment" onClick={() => removeAssessment(column.key)} aria-label={`Remove ${column.clean_name || 'assessment'}`}>
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                  <small>{CATEGORY_SHORT_LABELS[column.category]} / {column.max_score || 0} pts</small>
-                </th>
-              ))}
-              {showSummaryCols && attendanceDates.map(date => (
-                <th 
-                  key={date} 
-                  className="gradebook-assessment-header" 
-                  style={{ textAlign: 'center', cursor: 'pointer', padding: '0.5rem', minWidth: '70px' }}
-                  onClick={() => {
-                    setDailyAttendanceDate(date);
-                    loadDailyAttendance(date);
-                    setShowDailyAttendance(true);
-                  }}
-                  title="Click to manage attendance for this date"
-                >
-                  <div className="gradebook-assessment-title" style={{ justifyContent: 'center' }}>
-                    <span style={{ textDecoration: 'underline', textUnderlineOffset: '2px', color: 'var(--primary)', fontWeight: 600 }}>
-                      {formatAttendanceDateLabel(date)}
-                    </span>
-                  </div>
-                  <small>P/A</small>
-                </th>
-              ))}
-            </tr>
+                </tr>
+                <tr className="gradebook-group-row">
+                  <th colSpan={2} className="gradebook-category gradebook-category-attendance">Attendance</th>
+                  <th colSpan={visibleColumnsByCategory.project.length + 1} className="gradebook-category gradebook-category-project">Performance (40%: PT + AT)</th>
+                  <th colSpan={visibleColumnsByCategory.quiz.length + 1} className="gradebook-category gradebook-category-quiz">Quiz</th>
+                  <th colSpan={visibleColumnsByCategory.major_exam.length + 1} className="gradebook-category gradebook-category-major_exam">{activeTab === 'midterm' ? 'Mid Ex' : 'Final Ex'}</th>
+                  <th colSpan={6} className="gradebook-category gradebook-category-term-grade">{PERIOD_LABELS[activeTab]} Grade</th>
+                </tr>
+                <tr>
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">ATT</th>
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">GRD</th>
+                  {visibleColumnsByCategory.project.map(column => (
+                    <th key={column.key} className="gradebook-assessment-header">
+                      <div className="gradebook-assessment-title">
+                        <span>{column.clean_name || 'ACT'}</span>
+                        <button type="button" className="gradebook-remove-assessment" onClick={() => removeAssessment(column.key)} aria-label={`Remove ${column.clean_name || 'assessment'}`}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                      <small>{column.max_score || 0} pts</small>
+                    </th>
+                  ))}
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">AVE</th>
+                  {visibleColumnsByCategory.quiz.map(column => (
+                    <th key={column.key} className="gradebook-assessment-header">
+                      <div className="gradebook-assessment-title">
+                        <span>{column.clean_name || 'Quiz'}</span>
+                        <button type="button" className="gradebook-remove-assessment" onClick={() => removeAssessment(column.key)} aria-label={`Remove ${column.clean_name || 'assessment'}`}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                      <small>{column.max_score || 0} pts</small>
+                    </th>
+                  ))}
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">AVE</th>
+                  {visibleColumnsByCategory.major_exam.map(column => (
+                    <th key={column.key} className="gradebook-assessment-header">
+                      <div className="gradebook-assessment-title">
+                        <span>{column.clean_name || 'Exam'}</span>
+                        <button type="button" className="gradebook-remove-assessment" onClick={() => removeAssessment(column.key)} aria-label={`Remove ${column.clean_name || 'assessment'}`}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                      <small>{column.max_score || 0} pts</small>
+                    </th>
+                  ))}
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">AVE</th>
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">{Math.round((40 - attendanceWeight) * 10) / 10}%PT</th>
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">30%Q</th>
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">30%ME</th>
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">{attendanceWeight}%AT</th>
+                  <th className="gradebook-assessment-header gradebook-record-grade-header">{TERM_GRADE_SHORT_LABELS[activeTab]}</th>
+                  <th className="gradebook-assessment-header gradebook-record-grade-header">{TERM_GRADE_SHORT_LABELS[activeTab]}%</th>
+                </tr>
+              </>
+            ) : (
+              <>
+                <tr className="gradebook-group-row">
+                  <th rowSpan={4} className="gradebook-student-col">Student</th>
+                  {attendanceDates.length > 0 && (
+                    <th colSpan={attendanceDates.length} className="gradebook-period-header" style={{ textAlign: 'center', backgroundColor: 'var(--bg-elevated)', padding: '0.4rem', borderBottom: '1px solid var(--border)' }}>
+                      ATTENDANCE
+                    </th>
+                  )}
+                  <>
+                    <th rowSpan={4} style={{ textAlign: 'center', verticalAlign: 'middle', padding: '0 1rem' }}>Weighted</th>
+                    <th rowSpan={4} style={{ textAlign: 'center', verticalAlign: 'middle', padding: '0 1rem' }}>Grade</th>
+                    <th rowSpan={4} style={{ textAlign: 'center', verticalAlign: 'middle', padding: '0 1rem' }}>Remarks</th>
+                  </>
+                </tr>
+                <tr className="gradebook-group-row">
+                  {attendanceDates.length > 0 && (
+                    <th colSpan={attendanceDates.length} className="gradebook-category gradebook-category-project" style={{ textAlign: 'center' }}>
+                      Detailed Attendance by Date
+                    </th>
+                  )}
+                </tr>
+                <tr>
+                  {attendanceDateGroups.map(group => (
+                    <th
+                      key={group.period}
+                      colSpan={group.dates.length}
+                      className={`gradebook-category gradebook-category-${group.period === 'midterm' ? 'quiz' : 'major_exam'}`}
+                      style={{ textAlign: 'center' }}
+                    >
+                      {group.label}
+                    </th>
+                  ))}
+                </tr>
+                <tr>
+                  {attendanceDateGroups.flatMap(group => group.dates).map(date => (
+                    <th
+                      key={date}
+                      className="gradebook-assessment-header gradebook-attendance-date-header"
+                      style={{ textAlign: 'center', padding: '0.5rem', minWidth: '70px', position: 'relative' }}
+                    >
+                      <div className="gradebook-assessment-title" style={{ justifyContent: 'center', flexDirection: 'column', gap: '0.25rem' }}>
+                        <span 
+                          style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '2px', color: 'var(--primary)', fontWeight: 600 }}
+                          onClick={() => {
+                            setDailyAttendanceDate(date);
+                            loadDailyAttendance(date);
+                            setShowDailyAttendance(true);
+                          }}
+                          title="Click to edit attendance for this date"
+                        >
+                          {formatAttendanceDateLabel(date)}
+                        </span>
+                        <button
+                          type="button"
+                          className="gradebook-delete-attendance-date"
+                          onClick={() => deleteAttendanceDate(date)}
+                          disabled={deletingAttendanceDate === date}
+                          aria-label={`Delete attendance for ${formatAttendanceDateLabel(date)}`}
+                          title="Delete this attendance date"
+                        >
+                          {deletingAttendanceDate === date ? (
+                            <span className="spinner" style={{ width: '12px', height: '12px' }} />
+                          ) : (
+                            <Trash2 size={12} />
+                          )}
+                        </button>
+                      </div>
+                      <small>P/A</small>
+                    </th>
+                  ))}
+                </tr>
+              </>
+            )}
           </thead>
           <tbody>
             {grades.map((student, index) => (
               <tr key={student.enrollment_id}>
                 <td className="gradebook-student-col">
-                  <div className="gradebook-student-name">{index + 1}. {student.last_name}, {student.first_name}</div>
-                  <div className="gradebook-student-meta">{student.student_number || 'No student no.'} | {student.program || 'No program'}</div>
+                  <div>
+                    <div className="gradebook-student-name">{index + 1}. {student.last_name}, {student.first_name}</div>
+                    <div className="gradebook-student-meta">{student.student_number || 'No student no.'} | {student.program || 'No program'}</div>
+                  </div>
                 </td>
-                {visibleColumns.map(column => {
-                  const score = scoreMatrix[student.enrollment_id]?.[column.key] ?? '';
-                  const invalid = isInvalidScore(score, column.max_score);
+                {!showSummaryCols && (() => {
+                  const termRecord = calculateTermRecord(student, activeTab);
+                  const renderScoreCells = columns => columns.map(column => {
+                    const score = scoreMatrix[student.enrollment_id]?.[column.key] ?? '';
+                    const invalid = isInvalidScore(score, column.max_score);
+
+                    return (
+                      <td key={`${student.enrollment_id}-${column.key}`} className={`gradebook-score-cell ${invalid ? 'is-invalid' : ''}`}>
+                        <input
+                          type="number"
+                          className="gradebook-score-input"
+                          min="0"
+                          max={column.max_score || undefined}
+                          step="0.01"
+                          value={score}
+                          onChange={event => updateScore(student.enrollment_id, column.key, event.target.value)}
+                          aria-label={`${column.clean_name || 'Assessment'} score for ${student.last_name}, ${student.first_name}`}
+                        />
+                      </td>
+                    );
+                  });
 
                   return (
-                    <td key={`${student.enrollment_id}-${column.key}`} className={`gradebook-score-cell ${invalid ? 'is-invalid' : ''}`}>
-                      <input
-                        type="number"
-                        className="gradebook-score-input"
-                        min="0"
-                        max={column.max_score || undefined}
-                        step="0.01"
-                        value={score}
-                        onChange={event => updateScore(student.enrollment_id, column.key, event.target.value)}
-                        aria-label={`${column.clean_name || 'Assessment'} score for ${student.last_name}, ${student.first_name}`}
-                      />
-                    </td>
+                    <>
+                      <td className="gradebook-record-value">{termRecord.attendanceMeetings || '--'}</td>
+                      <td className="gradebook-record-value gradebook-record-average">{formatRecordNumber(termRecord.attendanceGrade)}</td>
+                      {renderScoreCells(visibleColumnsByCategory.project)}
+                      <td className="gradebook-record-value gradebook-record-average">{formatRecordNumber(termRecord.projectAverage)}</td>
+                      {renderScoreCells(visibleColumnsByCategory.quiz)}
+                      <td className="gradebook-record-value gradebook-record-average">{formatRecordNumber(termRecord.quizAverage)}</td>
+                      {renderScoreCells(visibleColumnsByCategory.major_exam)}
+                      <td className="gradebook-record-value gradebook-record-average">{formatRecordNumber(termRecord.examAverage)}</td>
+                      <td className="gradebook-record-value gradebook-record-weighted">{formatRecordNumber(termRecord.examContribution)}</td>
+                      <td className="gradebook-record-value gradebook-record-weighted">{formatRecordNumber(termRecord.quizContribution)}</td>
+                      <td className="gradebook-record-value gradebook-record-weighted">{formatRecordNumber(termRecord.projectContribution)}</td>
+                      <td className="gradebook-record-value gradebook-record-weighted">{formatRecordNumber(termRecord.attendanceContribution)}</td>
+                      <td className="gradebook-record-value gradebook-record-term-grade" style={{ color: shouldShowTermGrade ? getFinalGradeColor(termRecord.termGrade) : 'var(--text-muted)' }}>
+                        {shouldShowTermGrade && termRecord.termGrade !== null ? termRecord.termGrade.toFixed(2) : '--'}
+                      </td>
+                      <td className="gradebook-record-value gradebook-record-term-grade" style={{ color: shouldShowTermGrade ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: 600 }}>
+                        {shouldShowTermGrade && termRecord.weightedScore !== null ? formatRecordNumber(termRecord.weightedScore) + '%' : '--'}
+                      </td>
+                    </>
                   );
-                })}
+                })()}
 
                 {showSummaryCols && attendanceDates.map(date => {
                   const record = ensureArray(student.attendance).find(r => r.attendance_date === date);
@@ -1060,9 +1670,10 @@ export default function GradeBook() {
                 )}
               </tr>
             ))}
-            {!grades.length && <tr><td colSpan={visibleColumns.length + (showSummaryCols ? attendanceDates.length + 4 : 1)} className="empty-state">No students enrolled</td></tr>}
+            {!grades.length && <tr><td colSpan={showSummaryCols ? attendanceDates.length + 4 : termRecordColumnCount + 1} className="empty-state">No students enrolled</td></tr>}
           </tbody>
         </table>
+        )}
       </div>
 
       {showSetup && (
@@ -1092,7 +1703,7 @@ export default function GradeBook() {
                 </div>
               )}
               {assessmentColumns.map(column => (
-                <div key={column.key} className="gradebook-setup-row">
+                <div key={column.key} className="gradebook-setup-row" style={{ opacity: column.isDraft ? 0.8 : 1, backgroundColor: column.isDraft ? 'var(--accent-muted)' : 'transparent' }}>
                   <select className="input-field" value={column.period} onChange={event => updateAssessment(column.key, 'period', event.target.value)}>
                     <option value="midterm">Midterm</option>
                     <option value="final">Final</option>
@@ -1102,7 +1713,13 @@ export default function GradeBook() {
                     <option value="major_exam">Major Exam</option>
                     <option value="project">Perf. Task</option>
                   </select>
-                  <input className="input-field" value={column.clean_name} onChange={event => updateAssessment(column.key, 'clean_name', event.target.value)} placeholder="e.g. Quiz 1" />
+                  <input
+                    className="input-field"
+                    value={column.clean_name}
+                    onChange={event => updateAssessment(column.key, 'clean_name', event.target.value)}
+                    placeholder={column.isDraft ? "e.g. Quiz 1 (Draft - will be saved)" : "e.g. Quiz 1"}
+                    style={{ fontStyle: column.isDraft ? 'italic' : 'normal' }}
+                  />
                   <input type="number" min="1" className="input-field" value={column.max_score} onChange={event => updateAssessment(column.key, 'max_score', event.target.value)} placeholder="Pts" />
                   <button className="btn btn-ghost btn-sm" style={{ padding: '0', width: '36px', height: '36px', color: 'var(--danger)' }} onClick={() => removeAssessment(column.key)} aria-label="Remove assessment"><Trash2 size={16} /></button>
                 </div>
@@ -1110,7 +1727,17 @@ export default function GradeBook() {
               {!assessmentColumns.length && <div className="empty-state" style={{ padding: '2rem' }}>No assessments yet. Add a quiz, exam, or performance task.</div>}
             </div>
 
-            <button className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} onClick={() => setShowSetup(false)}>Done</button>
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: '1rem' }}
+              onClick={async () => {
+                const saved = await saveScoreGrid();
+                if (saved) setShowSetup(false);
+              }}
+              disabled={savingScores || invalidScoreCount > 0}
+            >
+              {savingScores ? 'Saving...' : 'Save Assessments'}
+            </button>
           </div>
         </div>
       )}
@@ -1161,20 +1788,29 @@ export default function GradeBook() {
               <button className="btn btn-ghost btn-sm" onClick={() => setShowAttendance(null)}><X size={18} /></button>
             </div>
 
-            <div className="flex-between" style={{ marginBottom: '0.75rem' }}>
+            <div style={{ padding: '1rem', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                <strong style={{ color: 'var(--text-primary)' }}>How to add attendance:</strong>
+                <ol style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', lineHeight: 1.6 }}>
+                  <li>Click "Add Date" to create a new attendance entry</li>
+                  <li>Select the date when class was held</li>
+                  <li>Mark as Present (+1 point) or Absent (0 points)</li>
+                  <li>Click "Save Attendance" when done</li>
+                </ol>
+              </div>
               {(() => {
                 const stats = attendanceStats(attendance);
                 return (
-                  <div className="metric-strip" style={{ flex: 1 }}>
-                    <div><strong>{stats.present}</strong><span>Present Points</span></div>
-                    <div><strong>{stats.total}</strong><span>Class Dates</span></div>
-                    <div><strong>{stats.percentage ?? '-'}{stats.percentage != null ? '%' : ''}</strong><span>Attendance Rate</span></div>
+                  <div className="metric-strip" style={{ marginTop: '0.75rem' }}>
+                    <div><strong>{stats.present}</strong><span>Present</span></div>
+                    <div><strong>{stats.total - stats.present}</strong><span>Absent</span></div>
+                    <div><strong>{stats.percentage ?? '-'}{stats.percentage != null ? '%' : ''}</strong><span>Rate</span></div>
                   </div>
                 );
               })()}
             </div>
 
-            <button className="btn btn-ghost btn-sm" onClick={addAttendance} style={{ marginBottom: '0.75rem' }}><Plus size={14} /> Add Date</button>
+            <button className="btn btn-primary btn-sm" onClick={addAttendance} style={{ marginBottom: '0.75rem', width: '100%' }}><Plus size={14} /> Add Attendance Date</button>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {attendance.map((row, index) => (
                 <div key={row.id || index} className="attendance-row">
@@ -1197,80 +1833,234 @@ export default function GradeBook() {
 
       {showDailyAttendance && (
         <div className="modal-overlay" onClick={() => !savingDailyAttendance && setShowDailyAttendance(false)}>
-          <div className="modal-content" onClick={event => event.stopPropagation()} style={{ maxWidth: '600px', display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}>
-            <div className="flex-between" style={{ marginBottom: '1rem', flexShrink: 0 }}>
+          <div className="modal-content attendance-sheet-modal" onClick={event => event.stopPropagation()}>
+            <div className="attendance-sheet-header">
               <div>
-                <h2>Daily Class Attendance</h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem' }}>Record attendance for all students on a specific date.</p>
+                <h2>Class Attendance</h2>
+                <p className="gradebook-modal-note">Mark attendance for all students on a specific date</p>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowDailyAttendance(false)} disabled={savingDailyAttendance}><X size={18} /></button>
             </div>
-            
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexShrink: 0, alignItems: 'center' }}>
-              <input 
-                type="date" 
-                className="input-field" 
-                value={dailyAttendanceDate} 
-                onChange={e => setDailyAttendanceDate(e.target.value)} 
-                style={{ width: '200px' }}
-                disabled={savingDailyAttendance}
-              />
-              <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => {
-                  const map = {};
-                  grades.forEach(s => map[s.enrollment_id] = 'present');
-                  setDailyAttendanceMap(map);
-                }} disabled={savingDailyAttendance}>Mark All Present</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => {
-                  const map = {};
-                  grades.forEach(s => map[s.enrollment_id] = 'absent');
-                  setDailyAttendanceMap(map);
-                }} disabled={savingDailyAttendance}>Mark All Absent</button>
+
+            <div className="attendance-sheet-controls">
+              <div className="attendance-control-row">
+                <div className="attendance-period-selector">
+                  <button
+                    type="button"
+                    className={`attendance-period-btn ${dailyAttendancePeriod === 'midterm' ? 'is-active is-midterm' : ''}`}
+                    onClick={() => setDailyAttendancePeriod('midterm')}
+                    disabled={savingDailyAttendance}
+                  >
+                    Midterm
+                  </button>
+                  <button
+                    type="button"
+                    className={`attendance-period-btn ${dailyAttendancePeriod === 'final' ? 'is-active is-final' : ''}`}
+                    onClick={() => setDailyAttendancePeriod('final')}
+                    disabled={savingDailyAttendance}
+                  >
+                    Final
+                  </button>
+                </div>
+
+                <label className="attendance-date-field">
+                  <span>Class Date</span>
+                  <input
+                    type="date"
+                    className="input-field"
+                    value={dailyAttendanceDate}
+                    onChange={e => setDailyAttendanceDate(e.target.value)}
+                    disabled={savingDailyAttendance}
+                  />
+                </label>
+              </div>
+
+              <div className="attendance-quick-actions">
+                <button 
+                  className="btn btn-ghost btn-sm" 
+                  onClick={() => markAllDailyAttendance('present')} 
+                  disabled={savingDailyAttendance || !grades.length}
+                  style={{ color: 'var(--success)' }}
+                >
+                  <CheckCircle size={16} /> Mark All Present
+                </button>
+                <button 
+                  className="btn btn-ghost btn-sm" 
+                  onClick={() => markAllDailyAttendance('absent')} 
+                  disabled={savingDailyAttendance || !grades.length}
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <X size={16} /> Mark All Absent
+                </button>
               </div>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '0.5rem', backgroundColor: 'var(--bg-surface)' }}>
-              {grades.map(student => (
-                <div key={student.enrollment_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.8rem', color: 'var(--primary)' }}>
-                      {student.first_name?.[0] || ''}{student.last_name?.[0] || ''}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{student.last_name}, {student.first_name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{student.student_number || student.student_id || 'No ID'}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                      className={`btn btn-sm ${dailyAttendanceMap[student.enrollment_id] === 'present' ? 'btn-primary' : 'btn-ghost'}`}
-                      onClick={() => setDailyAttendanceMap(prev => ({ ...prev, [student.enrollment_id]: 'present' }))}
-                      disabled={savingDailyAttendance}
-                    >
-                      Present
-                    </button>
-                    <button 
-                      className={`btn btn-sm ${dailyAttendanceMap[student.enrollment_id] === 'absent' ? 'btn-secondary' : 'btn-ghost'}`}
-                      style={{ color: dailyAttendanceMap[student.enrollment_id] === 'absent' ? 'var(--danger)' : undefined, borderColor: dailyAttendanceMap[student.enrollment_id] === 'absent' ? 'var(--danger)' : undefined }}
-                      onClick={() => setDailyAttendanceMap(prev => ({ ...prev, [student.enrollment_id]: 'absent' }))}
-                      disabled={savingDailyAttendance}
-                    >
-                      Absent
-                    </button>
-                  </div>
+            <div className={`attendance-sheet-summary attendance-summary-${dailyAttendancePeriod}`}>
+              <div className="attendance-summary-main">
+                <div className="attendance-summary-count">
+                  <span className="count-number">{dailyAttendanceStats.present}</span>
+                  <span className="count-label">Present</span>
                 </div>
-              ))}
-              {!grades.length && <div className="empty-state" style={{ padding: '2rem' }}>No students enrolled in this class.</div>}
+                <div className="attendance-summary-divider">/</div>
+                <div className="attendance-summary-count">
+                  <span className="count-number">{dailyAttendanceStats.total}</span>
+                  <span className="count-label">Total</span>
+                </div>
+              </div>
+              <div className="attendance-summary-badge">
+                {dailyAttendancePeriod === 'midterm' ? 'Midterm Period' : 'Final Period'}
+              </div>
             </div>
 
-            <div style={{ marginTop: '1rem', flexShrink: 0 }}>
-              <button 
-                className="btn btn-primary" 
-                style={{ width: '100%' }} 
-                onClick={saveDailyAttendance}
-                disabled={savingDailyAttendance || !grades.length}
+            <div className="attendance-sheet-list">
+              {grades.map((student, index) => {
+                const status = dailyAttendanceMap[student.enrollment_id];
+                return (
+                  <div key={student.enrollment_id} className={`attendance-sheet-row attendance-row-${status || 'unmarked'}`}>
+                    <div className="attendance-student-info">
+                      <div className="student-number">{index + 1}</div>
+                      <div className="student-details">
+                        <div className="student-name">{student.last_name}, {student.first_name}</div>
+                        <div className="student-meta">{student.student_number || 'No ID'} • {student.program || 'No Program'}</div>
+                      </div>
+                    </div>
+
+                    <div className="attendance-actions">
+                      <button
+                        type="button"
+                        className={`attendance-btn attendance-btn-present ${status === 'present' ? 'is-active' : ''}`}
+                        onClick={() => setDailyAttendanceMap(prev => ({ ...prev, [student.enrollment_id]: 'present' }))}
+                        disabled={savingDailyAttendance}
+                      >
+                        <CheckCircle size={16} />
+                        <span>Present</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`attendance-btn attendance-btn-absent ${status === 'absent' ? 'is-active' : ''}`}
+                        onClick={() => setDailyAttendanceMap(prev => ({ ...prev, [student.enrollment_id]: 'absent' }))}
+                        disabled={savingDailyAttendance}
+                      >
+                        <X size={16} />
+                        <span>Absent</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {!grades.length && <div className="empty-state" style={{ padding: '3rem' }}>No students enrolled in this class.</div>}
+            </div>
+
+            <div className="attendance-sheet-footer">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowDailyAttendance(false)}
+                disabled={savingDailyAttendance}
               >
-                {savingDailyAttendance ? 'Saving Attendance...' : 'Save Class Attendance'}
+                Cancel
+              </button>
+              <button
+                className={`btn btn-primary attendance-save-btn-${dailyAttendancePeriod}`}
+                onClick={saveDailyAttendance}
+                disabled={savingDailyAttendance || !grades.length || !dailyAttendanceDate || !dailyAttendancePeriod}
+              >
+                {savingDailyAttendance ? (
+                  <><span className="spinner" style={{ width: '14px', height: '14px' }} /> Saving...</>
+                ) : (
+                  <><Save size={16} /> Save Attendance</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAttendanceSettings && (
+        <div className="modal-overlay" onClick={() => !savingAttendanceWeight && setShowAttendanceSettings(false)}>
+          <div className="modal-content" onClick={event => event.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+              <div>
+                <h2 style={{ marginBottom: '0.5rem' }}>Attendance Weight (Inside Performance Category)</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0 }}>Set attendance weight. Performance Task weight will auto-adjust to maintain 40% total.</p>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowAttendanceSettings(false)} disabled={savingAttendanceWeight}><X size={18} /></button>
+            </div>
+
+            <div style={{ marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <label htmlFor="attendance-weight-slider" style={{ fontWeight: 600, fontSize: '0.9rem' }}>Attendance Weight (%)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="1"
+                    value={attendanceWeight}
+                    onChange={e => setAttendanceWeight(Math.max(0, Math.min(10, Number(e.target.value))))}
+                    className="input-field"
+                    style={{ width: '80px', textAlign: 'center', padding: '0.5rem' }}
+                    disabled={savingAttendanceWeight}
+                  />
+                  <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent)', minWidth: '60px' }}>{attendanceWeight}%</span>
+                </div>
+              </div>
+
+              <input
+                id="attendance-weight-slider"
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={attendanceWeight}
+                onChange={e => setAttendanceWeight(Number(e.target.value))}
+                disabled={savingAttendanceWeight}
+                style={{
+                  width: '100%',
+                  height: '8px',
+                  borderRadius: '4px',
+                  background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${attendanceWeight}%, var(--bg-elevated) ${attendanceWeight}%, var(--bg-elevated) 100%)`,
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                <span>0% (PT=40%)</span>
+                <span>5% (PT=35%)</span>
+                <span>10% (PT=30%)</span>
+              </div>
+            </div>
+
+            <div style={{ padding: '1rem', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                <strong style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Current Breakdown:</strong>
+                <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                  <li>Quiz: <strong>30%</strong> (fixed)</li>
+                  <li>Exam: <strong>30%</strong> (fixed)</li>
+                  <li>Performance Task: <strong>{40 - attendanceWeight}%</strong> (auto-adjusted)</li>
+                  <li>Attendance: <strong>{attendanceWeight}%</strong> (customizable)</li>
+                  <li style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>Total: <strong>100%</strong></li>
+                </ul>
+                <p style={{ margin: '0.75rem 0 0', fontSize: '0.75rem', fontStyle: 'italic' }}>Performance Category = PT ({40 - attendanceWeight}%) + Attendance ({attendanceWeight}%) = 40%</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                className="btn btn-secondary"
+                style={{ flex: 1 }}
+                onClick={() => setShowAttendanceSettings(false)}
+                disabled={savingAttendanceWeight}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                onClick={saveAttendanceWeight}
+                disabled={savingAttendanceWeight}
+              >
+                {savingAttendanceWeight ? 'Saving...' : 'Save Weight'}
               </button>
             </div>
           </div>

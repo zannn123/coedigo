@@ -1,316 +1,274 @@
-.gradebook-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
-}
+/* GradeBook Component Styles */
 
-.gradebook-helper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background:
-    linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-elevated) 62%, var(--accent-muted) 100%);
-}
-
-.gradebook-helper strong {
-  display: block;
-  margin-bottom: 0.2rem;
-  color: var(--text-primary);
-}
-
-.gradebook-helper p,
-.gradebook-modal-note {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  line-height: 1.45;
-}
-
-.gradebook-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.gradebook-metrics > div {
-  padding: 0.9rem 1rem;
+.gradebook-table-container {
+  overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
 }
 
-.gradebook-metrics strong {
-  display: block;
-  margin-bottom: 0.2rem;
-  color: var(--text-primary);
-  font-size: 1.15rem;
-}
-
-.gradebook-metrics span {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  font-weight: 650;
-  text-transform: uppercase;
-}
-
-.gradebook-savebar {
-  position: sticky;
-  top: 0.75rem;
-  z-index: 8;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(12px);
-  color: var(--text-secondary);
-}
-
-.gradebook-autosave-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-}
-
-.gradebook-autosave-status > span {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--success);
-  box-shadow: 0 0 0 4px var(--success-bg);
-}
-
-.gradebook-autosave-status strong {
-  color: var(--text-primary);
-  font-size: 0.875rem;
-}
-
-.gradebook-autosave-status.is-pending > span,
-.gradebook-autosave-status.is-saving > span {
-  background: var(--warning);
-  box-shadow: 0 0 0 4px var(--warning-bg);
-}
-
-.gradebook-autosave-status.is-saving > span {
-  animation: autosavePulse 900ms ease-in-out infinite;
-}
-
-.gradebook-autosave-status.is-error > span {
-  background: var(--danger);
-  box-shadow: 0 0 0 4px var(--danger-bg);
-}
-
-.gradebook-attendance-credit {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  margin: -0.25rem 0 1rem;
-  padding: 0.75rem 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--success) 35%, var(--border));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--success-bg) 72%, var(--bg-surface));
-  color: var(--text-secondary);
-}
-
-.gradebook-attendance-credit svg {
-  flex: 0 0 auto;
-  margin-top: 0.1rem;
-  color: var(--success);
-}
-
-.gradebook-attendance-credit strong {
-  display: block;
-  margin-bottom: 0.15rem;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-
-.gradebook-attendance-credit span {
-  display: block;
-  font-size: 0.82rem;
-  line-height: 1.45;
-}
-
-@keyframes autosavePulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(0.72); opacity: 0.55; }
-}
-
-.gradebook-table-container {
-  max-height: 66vh;
-}
-
 .gradebook-table {
-  border-collapse: separate;
-  border-spacing: 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
 }
 
 .gradebook-table th,
 .gradebook-table td {
+  border: 1px solid var(--border);
+  padding: 0.5rem;
+  text-align: left;
   vertical-align: middle;
 }
 
-.gradebook-table thead th {
+.gradebook-table th {
+  background: var(--bg-elevated);
+  font-weight: 600;
   position: sticky;
   top: 0;
-  z-index: 4;
-  background: var(--bg-elevated);
+  z-index: 10;
 }
 
-.gradebook-table thead tr:nth-child(2) th {
-  top: 41px;
-  z-index: 5;
+.gradebook-table tbody tr:hover td:not(.gradebook-student-col) {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.025));
 }
 
 .gradebook-student-col {
+  min-width: 200px;
   position: sticky;
   left: 0;
-  z-index: 6;
-  min-width: 260px;
-  max-width: 300px;
   background: var(--bg-surface);
-  box-shadow: 1px 0 0 var(--border);
+  z-index: 5;
 }
 
-tr:hover .gradebook-student-col {
-  background: linear-gradient(var(--accent-light), var(--accent-light)), var(--bg-surface);
+.gradebook-student-name {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
 }
 
-thead .gradebook-student-col {
-  z-index: 8;
-  background: var(--bg-elevated);
+.gradebook-student-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
 }
 
-.gradebook-group-row th {
+.gradebook-score-cell {
+  width: 120px;
   text-align: center;
+  background: color-mix(in srgb, var(--bg-surface) 88%, var(--primary) 12%);
 }
 
-.gradebook-category {
+.gradebook-score-cell.is-invalid {
+  background-color: var(--danger-muted);
+}
+
+.gradebook-score-input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bg-surface) 76%, var(--primary) 24%);
   color: var(--text-primary);
+  text-align: center;
+  padding: 0.25rem 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bg-surface) 70%, transparent);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.gradebook-category-major_exam {
-  background: color-mix(in srgb, var(--danger-bg) 70%, var(--bg-elevated));
+.gradebook-score-input:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--bg-surface) 68%, var(--primary) 32%);
 }
 
-.gradebook-category-quiz {
-  background: color-mix(in srgb, var(--info-bg) 70%, var(--bg-elevated));
-}
-
-.gradebook-category-project {
-  background: color-mix(in srgb, var(--success-bg) 70%, var(--bg-elevated));
+.gradebook-score-input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-color: var(--primary);
 }
 
 .gradebook-assessment-header {
-  min-width: 132px;
+  min-width: 120px;
+  text-align: center;
 }
 
 .gradebook-assessment-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.4rem;
-}
-
-.gradebook-assessment-title span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.gradebook-assessment-header small {
-  display: block;
-  margin-top: 0.25rem;
-  color: var(--text-muted);
-  font-size: 0.68rem;
-  font-weight: 600;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .gradebook-remove-assessment {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.125rem;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.gradebook-assessment-header:hover .gradebook-remove-assessment {
+  opacity: 1;
+}
+
+.gradebook-remove-assessment:hover {
+  color: var(--danger);
+  background: var(--danger-muted);
+}
+
+.gradebook-delete-attendance-date {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 3px;
+  opacity: 0;
+  transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
+  min-width: 24px;
+  min-height: 24px;
 }
 
-.gradebook-remove-assessment:hover,
-.gradebook-remove-assessment:focus-visible {
-  background: var(--danger-bg);
+.gradebook-attendance-date-header:hover .gradebook-delete-attendance-date {
+  opacity: 1;
+}
+
+.gradebook-delete-attendance-date:hover:not(:disabled) {
   color: var(--danger);
-  outline: none;
+  background: var(--danger-muted);
+  transform: scale(1.1);
 }
 
-.gradebook-student-name {
-  color: var(--text-primary);
-  font-weight: 700;
+.gradebook-delete-attendance-date:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
-.gradebook-student-meta {
-  margin-top: 0.2rem;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-}
-
-.gradebook-score-cell {
-  padding: 0.5rem;
-}
-
-.gradebook-score-input {
-  width: 100%;
-  min-width: 92px;
-  height: 38px;
-  padding: 0.4rem 0.55rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  font-size: 0.875rem;
+.gradebook-category {
   text-align: center;
-  outline: none;
-  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-top: 3px solid transparent;
 }
 
-.gradebook-score-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-muted);
+.gradebook-category-major_exam {
+  background: color-mix(in srgb, var(--warning-muted) 78%, var(--bg-elevated));
+  color: var(--warning);
+  border-top-color: var(--warning);
 }
 
-.gradebook-score-cell.is-invalid .gradebook-score-input {
-  border-color: var(--danger);
-  background: var(--danger-bg);
+.gradebook-category-quiz {
+  background: color-mix(in srgb, var(--info-muted) 78%, var(--bg-elevated));
+  color: var(--info);
+  border-top-color: var(--info);
+}
+
+.gradebook-category-project {
+  background: color-mix(in srgb, var(--success-muted) 78%, var(--bg-elevated));
+  color: var(--success);
+  border-top-color: var(--success);
+}
+
+.gradebook-category-attendance {
+  background: color-mix(in srgb, var(--info-muted) 78%, var(--bg-elevated));
+  color: var(--info);
+  border-top-color: var(--info);
+}
+
+.gradebook-category-term-grade {
+  background: color-mix(in srgb, var(--accent-muted) 84%, var(--bg-elevated));
+  color: var(--accent);
+  border-top-color: var(--accent);
+}
+
+.gradebook-period-header {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gradebook-record-table th,
+.gradebook-record-table td {
+  padding: 0.4rem;
+  text-align: center;
+}
+
+.gradebook-record-table .gradebook-student-col {
+  text-align: left;
+}
+
+.gradebook-record-term {
+  text-align: center;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+
+.gradebook-record-table .gradebook-assessment-header:not(.gradebook-record-summary-header):not(.gradebook-record-grade-header) {
+  background: color-mix(in srgb, var(--bg-elevated) 82%, var(--primary) 18%);
+}
+
+.gradebook-record-table .gradebook-assessment-header small {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--text-secondary);
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.gradebook-record-summary-header {
+  min-width: 66px;
+  font-size: 0.75rem;
+  background: color-mix(in srgb, var(--accent-muted) 45%, var(--bg-elevated));
+  color: color-mix(in srgb, var(--accent) 88%, var(--text-primary));
+}
+
+.gradebook-record-grade-header {
+  min-width: 64px;
+  background: color-mix(in srgb, var(--accent-muted) 85%, var(--bg-elevated));
+  color: var(--accent);
+  border-left: 2px solid var(--accent);
+}
+
+.gradebook-record-value {
+  min-width: 66px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-surface) 82%, var(--bg-elevated));
+}
+
+.gradebook-record-average {
+  background: color-mix(in srgb, var(--accent-muted) 72%, var(--bg-surface));
+  color: color-mix(in srgb, var(--accent) 85%, var(--text-primary));
+  border-left: 2px solid var(--accent);
+  border-right: 2px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+.gradebook-record-weighted {
+  background: color-mix(in srgb, var(--accent-muted) 64%, var(--bg-surface));
+  color: color-mix(in srgb, var(--accent) 80%, var(--text-primary));
+}
+
+.gradebook-record-term-grade {
+  background: color-mix(in srgb, var(--accent-muted) 88%, var(--bg-surface));
+  border-left: 2px solid var(--accent);
+  font-size: 0.875rem;
 }
 
 .gradebook-setup-actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.5rem;
+  flex-wrap: wrap;
   margin-bottom: 1rem;
-}
-
-.gradebook-setup-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
 }
 
 .gradebook-setup-row {
@@ -318,42 +276,605 @@ thead .gradebook-student-col {
   grid-template-columns: 110px 140px 1fr 100px 36px;
   gap: 0.75rem;
   align-items: center;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.5rem;
 }
 
-@media (max-width: 920px) {
-  .gradebook-helper,
-  .gradebook-savebar {
-    align-items: stretch;
-    flex-direction: column;
+.gradebook-autosave-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.gradebook-autosave-status span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.gradebook-autosave-status.is-saved span {
+  background: var(--success);
+}
+
+.gradebook-autosave-status.is-pending span {
+  background: var(--warning);
+  animation: pulse 1.5s infinite;
+}
+
+.gradebook-autosave-status.is-saving span {
+  background: var(--primary);
+  animation: pulse 1s infinite;
+}
+
+.gradebook-autosave-status.is-error span {
+  background: var(--danger);
+}
+
+.gradebook-attendance-credit {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--info-muted);
+  border: 1px solid var(--info);
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.gradebook-attendance-credit strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+}
+
+.gradebook-modal-note {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.attendance-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.attendance-row input,
+.attendance-row select {
+  flex: 1;
+}
+
+.metric-strip {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.metric-strip > div {
+  text-align: center;
+}
+
+.metric-strip strong {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.metric-strip span {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.attendance-sheet-modal {
+  width: min(920px, calc(100vw - 2rem));
+  max-width: 920px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.attendance-sheet-header,
+.attendance-sheet-controls,
+.attendance-sheet-footer {
+  flex-shrink: 0;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.attendance-sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.attendance-sheet-header h2 {
+  margin-bottom: 0.25rem;
+}
+
+.attendance-sheet-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+
+.attendance-control-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.attendance-period-selector {
+  display: inline-flex;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+}
+
+.attendance-period-btn {
+  padding: 0.5rem 1.5rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: calc(var(--radius-md) - 2px);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.attendance-period-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.attendance-period-btn.is-active {
+  color: white;
+  font-weight: 700;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.attendance-period-btn.is-active.is-midterm {
+  background: var(--info);
+}
+
+.attendance-period-btn.is-active.is-final {
+  background: var(--warning);
+}
+
+.attendance-period-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.attendance-date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  flex: 1;
+  max-width: 240px;
+}
+
+.attendance-date-field span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.attendance-quick-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.attendance-date-field {
+  min-width: 0;
+  flex: 1;
+}
+
+.attendance-date-field span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+
+
+.attendance-absent-action {
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+.attendance-absent-action:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-muted);
+}
+
+.attendance-save-btn-midterm {
+  background: var(--info) !important;
+  border-color: var(--info) !important;
+}
+
+.attendance-save-btn-midterm:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--info) 85%, black) !important;
+}
+
+.attendance-save-btn-final {
+  background: var(--warning) !important;
+  border-color: var(--warning) !important;
+}
+
+.attendance-save-btn-final:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--warning) 85%, black) !important;
+}
+
+.attendance-sheet-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.attendance-sheet-summary.attendance-summary-midterm {
+  background: linear-gradient(to right, var(--info-muted) 0%, var(--bg-surface) 100%);
+  border-left: 4px solid var(--info);
+}
+
+.attendance-sheet-summary.attendance-summary-final {
+  background: linear-gradient(to right, var(--warning-muted) 0%, var(--bg-surface) 100%);
+  border-left: 4px solid var(--warning);
+}
+
+.attendance-summary-main {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.attendance-summary-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.count-number {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.count-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 0.25rem;
+}
+
+.attendance-summary-divider {
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--text-muted);
+  margin: 0 0.5rem;
+}
+
+.attendance-summary-badge {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.attendance-summary-midterm .attendance-summary-badge {
+  background: var(--info);
+  color: white;
+  border-color: var(--info);
+}
+
+.attendance-summary-final .attendance-summary-badge {
+  background: var(--warning);
+  color: white;
+  border-color: var(--warning);
+}
+
+.attendance-sheet-list {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-surface);
+}
+
+.attendance-sheet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.attendance-sheet-row:hover {
+  background: var(--bg-elevated);
+}
+
+.attendance-row-present {
+  background: color-mix(in srgb, var(--success) 3%, transparent);
+  border-left: 3px solid var(--success);
+}
+
+.attendance-row-absent {
+  background: color-mix(in srgb, var(--danger) 3%, transparent);
+  border-left: 3px solid var(--danger);
+}
+
+.attendance-row-unmarked {
+  border-left: 3px solid transparent;
+}
+
+.attendance-student-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.student-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.student-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.student-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.student-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.125rem;
+}
+
+.attendance-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.attendance-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.attendance-btn:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--text-muted);
+}
+
+.attendance-btn-present.is-active {
+  background: var(--success);
+  border-color: var(--success);
+  color: white;
+}
+
+.attendance-btn-absent.is-active {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+
+.attendance-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.attendance-sheet-footer {
+  border-top: 1px solid var(--border);
+  border-bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  background: var(--bg-elevated);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Toast notifications */
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 0.875rem;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  animation: slideInUp 0.3s ease-out;
+}
+
+.toast-success {
+  background: var(--success);
+  color: white;
+}
+
+.toast-error {
+  background: var(--danger);
+  color: white;
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .gradebook-setup-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
   }
 
-  .gradebook-savebar .btn {
-    width: 100%;
-  }
-
-  .gradebook-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .gradebook-table {
+    font-size: 0.8125rem;
   }
 
   .gradebook-student-col {
-    min-width: 220px;
+    min-width: 150px;
   }
-}
 
-@media (max-width: 640px) {
-  .gradebook-toolbar .btn {
+  .gradebook-score-cell {
+    width: 80px;
+  }
+
+  .attendance-sheet-modal {
+    width: calc(100vw - 1rem);
+    max-height: 92vh;
+  }
+
+  .attendance-sheet-header,
+  .attendance-sheet-controls,
+  .attendance-sheet-footer {
+    padding: 0.875rem;
+  }
+
+  .attendance-control-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .attendance-period-selector {
     width: 100%;
   }
 
-  .gradebook-metrics {
+  .attendance-period-btn {
+    flex: 1;
+  }
+
+  .attendance-date-field {
+    max-width: none;
+  }
+
+  .attendance-quick-actions {
+    flex-direction: column;
+  }
+
+  .attendance-quick-actions button {
+    width: 100%;
+  }
+
+  .attendance-sheet-summary {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .attendance-student-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .attendance-actions {
+    width: 100%;
+  }
+
+  .attendance-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .attendance-date-field {
+    min-width: 0;
+  }
+
+  .attendance-bulk-actions {
+    display: grid;
     grid-template-columns: 1fr;
   }
 
-  .gradebook-setup-row {
-    grid-template-columns: 1fr;
+  .attendance-sheet-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .gradebook-setup-row .btn {
+  .attendance-sheet-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    padding: 0.875rem;
+  }
+
+  .attendance-toggle {
     width: 100%;
   }
 }

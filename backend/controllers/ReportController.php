@@ -707,15 +707,16 @@ class ReportController {
         $layout = [];
         $col = 4;
 
+        // Always show midterm columns even if empty
         $layout['mid_quiz_start'] = $col;
-        $layout['mid_quiz_count'] = max(11, count($terms['midterm']['quiz']));
+        $layout['mid_quiz_count'] = max(1, count($terms['midterm']['quiz']));
         $layout['mid_quiz_end'] = $col + $layout['mid_quiz_count'] - 1;
         $col += $layout['mid_quiz_count'];
         $layout['mid_quiz_total'] = $col++;
         $layout['mid_quiz_weighted'] = $col++;
 
         $layout['mid_project_start'] = $col;
-        $layout['mid_project_count'] = max(10, count($terms['midterm']['project']));
+        $layout['mid_project_count'] = max(1, count($terms['midterm']['project']));
         $layout['mid_project_end'] = $col + $layout['mid_project_count'] - 1;
         $col += $layout['mid_project_count'];
         $layout['mid_attendance_score'] = $col++;
@@ -727,15 +728,16 @@ class ReportController {
         $layout['midterm_average'] = $col++;
         $layout['midterm_grade'] = $col++;
 
+        // Always show final columns even if empty
         $layout['final_quiz_start'] = $col;
-        $layout['final_quiz_count'] = max(10, count($terms['final']['quiz']));
+        $layout['final_quiz_count'] = max(1, count($terms['final']['quiz']));
         $layout['final_quiz_end'] = $col + $layout['final_quiz_count'] - 1;
         $col += $layout['final_quiz_count'];
         $layout['final_quiz_total'] = $col++;
         $layout['final_quiz_weighted'] = $col++;
 
         $layout['final_project_start'] = $col;
-        $layout['final_project_count'] = max(10, count($terms['final']['project']));
+        $layout['final_project_count'] = max(1, count($terms['final']['project']));
         $layout['final_project_end'] = $col + $layout['final_project_count'] - 1;
         $col += $layout['final_project_count'];
         $layout['final_attendance_score'] = $col++;
@@ -762,13 +764,14 @@ class ReportController {
         $layout = [];
         $col = 4;
 
+        // Always show at least 1 column for each term
         $layout['mid_start'] = $col;
-        $layout['mid_count'] = max(30, count($attendanceTerms['midterm']));
+        $layout['mid_count'] = max(1, count($attendanceTerms['midterm']));
         $layout['mid_end'] = $col + $layout['mid_count'] - 1;
         $col += $layout['mid_count'];
         $layout['mid_total'] = $col++;
         $layout['final_start'] = $col;
-        $layout['final_count'] = max(30, count($attendanceTerms['final']));
+        $layout['final_count'] = max(1, count($attendanceTerms['final']));
         $layout['final_end'] = $col + $layout['final_count'] - 1;
         $col += $layout['final_count'];
         $layout['final_total'] = $col++;
@@ -816,8 +819,7 @@ class ReportController {
         if ($value === null || $value === '' || !is_numeric($value)) {
             return [
                 'col' => $column,
-                'value' => 0,
-                'type' => 'number',
+                'value' => '',
                 'style' => $style,
             ];
         }
