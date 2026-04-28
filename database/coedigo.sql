@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- ============================================================
 -- SUBJECTS TABLE
--- Academic subject catalog
+-- Academic subject catalog with approval workflow
 -- ============================================================
 CREATE TABLE IF NOT EXISTS subjects (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -52,13 +52,19 @@ CREATE TABLE IF NOT EXISTS subjects (
     units DECIMAL(3,1) NOT NULL DEFAULT 3.0,
     department VARCHAR(100) DEFAULT NULL,
     program VARCHAR(150) DEFAULT NULL,
+    approval_status ENUM('pending', 'approved', 'rejected') DEFAULT 'approved' COMMENT 'Approval status for faculty-created subjects',
+    approved_by INT DEFAULT NULL COMMENT 'Program Chair or Admin who approved',
+    approved_at DATETIME DEFAULT NULL COMMENT 'When the subject was approved',
+    rejection_reason TEXT DEFAULT NULL COMMENT 'Reason if rejected',
     is_active TINYINT(1) DEFAULT 1,
     created_by INT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
+    FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_code (code),
-    INDEX idx_department (department)
+    INDEX idx_department (department),
+    INDEX idx_approval_status (approval_status)
 ) ENGINE=InnoDB;
 
 -- ============================================================

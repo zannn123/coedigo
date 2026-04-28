@@ -33,7 +33,9 @@ export default function DashboardLayout({ navItems }) {
       ? '/faculty/account'
       : user?.role === 'student'
         ? '/student/account'
-        : '/dean/account';
+        : user?.role === 'program_chair'
+          ? '/program-chair/account'
+          : '/dean/account';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -58,9 +60,21 @@ export default function DashboardLayout({ navItems }) {
 
   useEffect(() => {
     fetchUnreadCount();
-    const intervalId = window.setInterval(fetchUnreadCount, 45000);
+    const intervalId = window.setInterval(fetchUnreadCount, 10000);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    if (!notificationsOpen) return undefined;
+
+    fetchNotifications();
+    const intervalId = window.setInterval(() => {
+      fetchNotifications();
+      fetchUnreadCount();
+    }, 10000);
+
+    return () => window.clearInterval(intervalId);
+  }, [notificationsOpen]);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? '1' : '0');
@@ -137,6 +151,19 @@ export default function DashboardLayout({ navItems }) {
       }
     } catch {
       // Ignore read failure to avoid breaking dropdown interactions.
+    }
+  };
+
+  const handleNotificationSelect = async (item) => {
+    await handleNotificationRead(item.id);
+
+    if (item.reference_type === 'subject_approval') {
+      setNotificationsOpen(false);
+      if (user?.role === 'program_chair') {
+        navigate('/program-chair/subject-approval');
+      } else if (user?.role === 'faculty') {
+        navigate('/faculty/subjects');
+      }
     }
   };
 
@@ -377,7 +404,7 @@ export default function DashboardLayout({ navItems }) {
                             type="button"
                             key={item.id}
                             className={`notification-item ${item.is_read ? '' : 'is-unread'}`}
-                            onClick={() => handleNotificationRead(item.id)}
+                            onClick={() => handleNotificationSelect(item)}
                           >
                             <div className="notification-item-head">
                               <strong>{item.title}</strong>

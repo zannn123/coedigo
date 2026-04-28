@@ -36,7 +36,7 @@ export default function Login() {
     faculty: '/faculty',
     student: '/student',
     dean: '/dean',
-    program_chair: '/dean'
+    program_chair: '/program-chair'
   };
 
   const handleSubmit = async (e) => {

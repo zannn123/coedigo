@@ -522,17 +522,17 @@ class GradeController {
         ");
         $classInfo->execute([$enrollmentId]);
         $classData = $classInfo->fetch();
-        $attendanceWeight = $classData ? (float)($classData['attendance_weight'] ?? 100.0) : 100.0;
-        $attendanceWeight = max(0, min(100, $attendanceWeight)) / 100; // Normalize to 0-1
-
-        $this->syncAttendanceComponent($enrollmentId, $encodedBy, $attendanceWeight);
+        $classAttendanceWeight = $classData ? (float)($classData['attendance_weight'] ?? 5.0) : 5.0;
 
         $settings = $this->db->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('major_exam_weight','quiz_weight','project_weight','passing_grade','grade_scale')")->fetchAll(PDO::FETCH_KEY_PAIR);
         $examWeight = ((float)($settings['major_exam_weight'] ?? 30)) / 100;
         $quizWeight = ((float)($settings['quiz_weight'] ?? 30)) / 100;
         $projWeight = ((float)($settings['project_weight'] ?? 40)) / 100;
+        $attendanceWeight = min(max(0, $classAttendanceWeight) / 100, max(0, $projWeight));
         $passingGrade = (float)($settings['passing_grade'] ?? 3.00);
         $gradeScale = explode(',', $settings['grade_scale'] ?? '1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,5.0');
+
+        $this->syncAttendanceComponent($enrollmentId, $encodedBy, $attendanceWeight);
 
         $stmt = $this->db->prepare("
             SELECT category, component_name, max_score, score
@@ -728,20 +728,20 @@ class GradeController {
         ];
     }
 
-    private function calculateTermStats($termComponents, $attendanceRows, $examWeight, $quizWeight, $projWeight, $attendanceWeight = 1.0) {
+    private function calculateTermStats($termComponents, $attendanceRows, $examWeight, $quizWeight, $projWeight, $attendanceWeight = 0.05) {
         $examAvg = $this->transmutedAverage($termComponents['major_exam'] ?? []);
         $quizAvg = $this->transmutedAverage($termComponents['quiz'] ?? []);
-        $projectValues = $this->transmutedValues($termComponents['project'] ?? []);
+        $projectAvg = $this->performanceTaskAverage($termComponents['project'] ?? []);
         $attendanceValue = $this->transmutedAttendanceValue($attendanceRows);
+        $attendanceWeight = min(max(0, $attendanceWeight), max(0, $projWeight));
+        $performanceTaskWeight = max(0, $projWeight - $attendanceWeight);
 
-        if ($attendanceValue !== null && $attendanceWeight > 0) {
-            $projectValues[] = $attendanceValue * $attendanceWeight;
-        }
-
-        $projectAvg = $this->averagePresentValues($projectValues);
-        $hasScores = $examAvg !== null || $quizAvg !== null || $projectAvg !== null;
+        $hasScores = $examAvg !== null || $quizAvg !== null || $projectAvg !== null || $attendanceValue !== null;
         $weighted = $hasScores
-            ? (($examAvg ?? 0) * $examWeight) + (($quizAvg ?? 0) * $quizWeight) + (($projectAvg ?? 0) * $projWeight)
+            ? (($examAvg ?? 0) * $examWeight)
+                + (($quizAvg ?? 0) * $quizWeight)
+                + (($projectAvg ?? 0) * $performanceTaskWeight)
+                + (($attendanceValue ?? 0) * $attendanceWeight)
             : null;
 
         return [
@@ -755,6 +755,35 @@ class GradeController {
 
     private function transmutedAverage($components) {
         return $this->averagePresentValues($this->transmutedValues($components));
+    }
+
+    private function performanceTaskAverage($components) {
+        $values = [];
+        $subtotalScore = 0.0;
+        $subtotalMax = 0.0;
+
+        foreach ($components as $component) {
+            $maxScore = (float)($component['max_score'] ?? 0);
+            if ($maxScore <= 0 || !is_numeric($component['score'] ?? null)) {
+                continue;
+            }
+
+            $score = (float)$component['score'];
+
+            if ($maxScore < 100) {
+                $subtotalScore += $score;
+                $subtotalMax += $maxScore;
+                continue;
+            }
+
+            $values[] = ($score / $maxScore) * 100;
+        }
+
+        if ($subtotalMax > 0) {
+            array_unshift($values, (($subtotalScore / $subtotalMax) * 50) + 50);
+        }
+
+        return $this->averagePresentValues($values);
     }
 
     private function transmutedValues($components) {

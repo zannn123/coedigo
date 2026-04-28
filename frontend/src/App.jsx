@@ -16,9 +16,10 @@ import GradeBook from './pages/faculty/GradeBook';
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentSubjects from './pages/student/StudentSubjects';
 import DeanDashboard from './pages/dean/DeanDashboard';
+import SubjectApproval from './pages/program-chair/SubjectApproval';
 import AccountSettings from './pages/shared/AccountSettings';
 import ErrorLogs from './pages/admin/ErrorLogs';
-import { LayoutDashboard, Users, UserPlus, Settings, ScrollText, BookOpen, ClipboardList, BarChart3, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Users, UserPlus, Settings, ScrollText, BookOpen, ClipboardList, BarChart3, AlertTriangle, CheckSquare } from 'lucide-react';
 
 function ProtectedRoute({ children, roles }) {
   const { user } = useAuth();
@@ -51,12 +52,26 @@ const deanNav = [
   { path: '/dean', label: 'Monitoring', icon: <BarChart3 size={18} />, end: true },
 ];
 
+const programChairNav = [
+  { path: '/program-chair', label: 'Monitoring', icon: <BarChart3 size={18} />, end: true },
+  { path: '/program-chair/subject-approval', label: 'Subject Approval', icon: <CheckSquare size={18} /> },
+];
+
 function AppRoutes() {
   const { user } = useAuth();
 
+  const getDefaultRoute = () => {
+    if (!user) return '/login';
+    if (user.role === 'admin') return '/admin';
+    if (user.role === 'faculty') return '/faculty';
+    if (user.role === 'student') return '/student';
+    if (user.role === 'program_chair') return '/program-chair';
+    return '/dean';
+  };
+
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : user.role === 'student' ? '/student' : '/dean'} replace /> : <Login />} />
+      <Route path="/login" element={user ? <Navigate to={getDefaultRoute()} replace /> : <Login />} />
       <Route path="/request-account" element={<RequestAccount />} />
       <Route path="/developers" element={<Developers />} />
 
@@ -84,8 +99,14 @@ function AppRoutes() {
         <Route path="account" element={<AccountSettings />} />
       </Route>
 
-      <Route path="/dean" element={<ProtectedRoute roles={['dean','program_chair']}><DashboardLayout navItems={deanNav} /></ProtectedRoute>}>
+      <Route path="/dean" element={<ProtectedRoute roles={['dean']}><DashboardLayout navItems={deanNav} /></ProtectedRoute>}>
         <Route index element={<DeanDashboard />} />
+        <Route path="account" element={<AccountSettings />} />
+      </Route>
+
+      <Route path="/program-chair" element={<ProtectedRoute roles={['program_chair']}><DashboardLayout navItems={programChairNav} /></ProtectedRoute>}>
+        <Route index element={<DeanDashboard />} />
+        <Route path="subject-approval" element={<SubjectApproval />} />
         <Route path="account" element={<AccountSettings />} />
       </Route>
 

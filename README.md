@@ -24,6 +24,7 @@ cd COEDIGO
 # 2. Setup database
 mysql -u root -p < database/coedigo.sql
 mysql -u root -p coedigo_db < database/migration_attendance_weight.sql
+mysql -u root -p coedigo_db < database/migration_subject_approval.sql
 
 # 3. Configure backend
 # Edit backend/config/database.php with your credentials
@@ -48,28 +49,21 @@ cd frontend && npm run dev
 
 ## 📚 Documentation
 
+**Complete documentation:** [docs/README.md](docs/README.md)
+
 ### Getting Started
-- **[Installation Guide](docs/setup/INSTALLATION.md)** - Complete setup instructions
 - **[Quick Start](docs/setup/QUICK_START.md)** - Get running in 5 minutes
-- **[Configuration](docs/setup/CONFIGURATION.md)** - Environment and settings
+- **[Installation Guide](docs/setup/INSTALLATION.md)** - Complete setup instructions
 
 ### Features
 - **[Attendance Management](docs/features/ATTENDANCE_WEIGHT.md)** - Customizable attendance grading
-- **[Grade Computation](docs/features/GRADE_COMPUTATION.md)** - How grades are calculated
-- **[User Roles](docs/features/USER_ROLES.md)** - Admin, Faculty, Student, Dean
+- **[Subject Approval](docs/features/SUBJECT_APPROVAL.md)** - Subject approval workflow
+- **[GradeBook Changelog](docs/features/GRADEBOOK_CHANGELOG.md)** - Complete history of improvements
 
 ### Architecture
 - **[System Overview](docs/architecture/SYSTEM_OVERVIEW.md)** - High-level architecture
-- **[Database Schema](docs/architecture/DATABASE_SCHEMA.md)** - Tables and relationships
-- **[API Design](docs/architecture/API_DESIGN.md)** - RESTful API structure
-
-### API Reference
-- **[Authentication](docs/api/AUTHENTICATION.md)** - Login, logout, sessions
-- **[Grades API](docs/api/GRADES.md)** - Score encoding and retrieval
-- **[Classes API](docs/api/CLASSES.md)** - Class management endpoints
 
 ### Troubleshooting
-- **[Common Issues](docs/troubleshooting/COMMON_ISSUES.md)** - FAQ and solutions
 - **[Database Errors](docs/troubleshooting/DATABASE_ERRORS.md)** - Connection and driver issues
 - **[Save Failures](docs/troubleshooting/SAVE_FAILURES.md)** - Score saving problems
 
@@ -164,11 +158,17 @@ COEDIGO/
 
 **Main Tables:**
 - `users` - All system users
+- `subjects` - Subject catalog with approval workflow
 - `class_records` - Class instances
 - `enrollments` - Student-class assignments
 - `grade_components` - Individual scores
 - `grades` - Computed final grades
 - `attendance_records` - Dated attendance
+- `notifications` - System notifications
+
+**Migrations:**
+- `migration_attendance_weight.sql` - Attendance customization
+- `migration_subject_approval.sql` - Subject approval workflow
 
 **See:** [Database Schema](docs/architecture/DATABASE_SCHEMA.md)
 

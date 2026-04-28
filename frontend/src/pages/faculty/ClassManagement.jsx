@@ -16,7 +16,7 @@ export default function ClassManagement() {
   
   useEffect(() => { 
     fetch(); 
-    api.get('/subjects').then(r => setSubjects(r.data.data || [])); 
+    api.get('/subjects?context=class_create&status=approved').then(r => setSubjects(r.data.data || [])); 
     api.get('/settings').then(r => {
       const data = r.data.data || [];
       const map = {};

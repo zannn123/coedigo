@@ -60,24 +60,32 @@ class Mailer {
         $coedigoLogoHtml = $this->renderInlineLogo($inlineAssets['coedigo'] ?? null, 118, 'COEDIGO');
         $engineeringLogoHtml = $this->renderInlineLogo($inlineAssets['engineering'] ?? null, 86, 'College of Engineering');
 
+        // Get campus background image as base64
+        $campusBgPath = dirname(__DIR__) . '/assets/email/jrmsu-campus-bg.webp';
+        $campusBgBase64 = '';
+        if (file_exists($campusBgPath)) {
+            $campusBgBase64 = 'data:image/webp;base64,' . base64_encode(file_get_contents($campusBgPath));
+        }
+
         $html = '
-            <div style="margin:0;padding:0;background-color:#f7f1ea;font-family:Arial,Helvetica,sans-serif;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f7f1ea;">
+            <div style="margin:0;padding:0;background-color:#1a1a1a;font-family:Arial,Helvetica,sans-serif;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#1a1a1a;">
                 <tr>
                   <td align="center" style="padding:28px 14px;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:640px;background-color:#ffffff;border:1px solid #eadfce;border-radius:22px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:640px;background-color:#ffffff;border:2px solid #ff8c00;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(255,140,0,0.2);">
                       <tr>
-                        <td style="padding:0;background:linear-gradient(135deg, ' . $personalizedContent['gradient_start'] . ' 0%, ' . $personalizedContent['gradient_end'] . ' 100%);position:relative;">
-                          <div style="padding:26px 28px 22px;position:relative;z-index:2;">
+                        <td style="padding:0;position:relative;background-image:url(' . htmlspecialchars($campusBgBase64, ENT_QUOTES, 'UTF-8') . ');background-size:cover;background-position:center;">
+                          <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg, ' . $personalizedContent['gradient_start'] . ' 0%, ' . $personalizedContent['gradient_end'] . ' 100%);z-index:1;"></div>
+                          <div style="padding:32px 28px 28px;position:relative;z-index:2;">
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                               <tr>
                                 <td align="left" valign="middle" style="width:50%;padding-right:10px;">' . $coedigoLogoHtml . '</td>
                                 <td align="right" valign="middle" style="width:50%;padding-left:10px;">' . $engineeringLogoHtml . '</td>
                               </tr>
                             </table>
-                            <div style="margin-top:24px;font-size:11px;line-height:1.4;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:' . $personalizedContent['accent_color'] . ';">' . htmlspecialchars($personalizedContent['badge'], ENT_QUOTES, 'UTF-8') . '</div>
-                            <div style="margin-top:10px;font-size:30px;line-height:1.08;font-weight:700;color:#111827;">' . htmlspecialchars($personalizedContent['title'], ENT_QUOTES, 'UTF-8') . '</div>
-                            <div style="margin-top:12px;font-size:15px;line-height:1.75;color:#374151;max-width:520px;">
+                            <div style="margin-top:28px;font-size:11px;line-height:1.4;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:' . $personalizedContent['text_color'] . ';text-shadow:0 2px 4px rgba(0,0,0,0.3);">' . htmlspecialchars($personalizedContent['badge'], ENT_QUOTES, 'UTF-8') . '</div>
+                            <div style="margin-top:12px;font-size:32px;line-height:1.1;font-weight:700;color:' . $personalizedContent['text_color'] . ';text-shadow:0 2px 8px rgba(0,0,0,0.4);">' . htmlspecialchars($personalizedContent['title'], ENT_QUOTES, 'UTF-8') . '</div>
+                            <div style="margin-top:14px;font-size:15px;line-height:1.6;color:' . $personalizedContent['text_color'] . ';max-width:520px;text-shadow:0 1px 4px rgba(0,0,0,0.3);">
                               ' . htmlspecialchars($personalizedContent['subtitle'], ENT_QUOTES, 'UTF-8') . '
                             </div>
                           </div>
@@ -123,14 +131,20 @@ class Mailer {
                               </td>
                             </tr>
                           </table>
-                          <div style="margin-top:20px;padding:14px;background-color:#f9fafb;border-left:3px solid ' . $personalizedContent['accent_color'] . ';border-radius:6px;">
-                            <div style="font-size:12px;line-height:1.7;color:#374151;">
-                              <strong style="color:#111827;">Security Reminder:</strong> Change your password immediately after your first login. Keep your credentials confidential.
+                          <div style="margin-top:20px;padding:16px;background:linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);border-left:4px solid ' . $personalizedContent['accent_color'] . ';border-radius:8px;box-shadow:0 2px 8px rgba(255,140,0,0.1);">
+                            <div style="font-size:12px;line-height:1.7;color:#1a1a1a;">
+                              <strong style="color:#ff8c00;">🔒 Security Reminder:</strong> Change your password immediately after your first login. Keep your credentials confidential.
                             </div>
                           </div>
-                          <div style="margin-top:18px;font-size:12px;line-height:1.7;color:#6b7280;text-align:center;">
+                          <div style="margin-top:20px;font-size:12px;line-height:1.7;color:#6b7280;text-align:center;">
                             Questions? Contact the ' . htmlspecialchars($collegeName, ENT_QUOTES, 'UTF-8') . ' office.<br>
                             This is an automated message from ' . htmlspecialchars($systemName, ENT_QUOTES, 'UTF-8') . '.
+                          </div>
+                          <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;">
+                            <div style="font-size:11px;color:#9ca3af;">
+                              <strong style="color:#ff8c00;">COEDIGO</strong> - College of Engineering Digital Interface for Grading and Operations<br>
+                              Jose Rizal Memorial State University
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -189,34 +203,36 @@ class Mailer {
 
         if ($role === 'student') {
             if ($isFreshman) {
-                // Freshman students
+                // Freshman students - Orange theme
                 $content = [
                     'badge' => 'WELCOME FRESHIES',
                     'title' => 'Welcome, Future Engineer!',
                     'subtitle' => 'Your journey to becoming an engineer starts here. Access your grades, attendance, and class records all in one place.',
                     'greeting_line' => 'Hello ' . $recipientName . ', Welcome to Engineering!',
                     'intro_message' => 'Congratulations on joining the College of Engineering! Your COEDIGO account is ready. Use the credentials below to access your academic portal.',
-                    'gradient_start' => '#dbeafe',
-                    'gradient_end' => '#bfdbfe',
-                    'accent_color' => '#1d4ed8',
-                    'border_color' => '#93c5fd',
-                    'card_bg' => '#eff6ff',
-                    'button_bg' => '#2563eb',
+                    'gradient_start' => 'rgba(255, 140, 0, 0.95)',
+                    'gradient_end' => 'rgba(0, 0, 0, 0.85)',
+                    'accent_color' => '#ff8c00',
+                    'border_color' => '#ff8c00',
+                    'card_bg' => '#fff5e6',
+                    'button_bg' => '#ff8c00',
+                    'text_color' => '#ffffff',
                 ];
             } else {
-                // Senior students (2nd year and up)
+                // Senior students (2nd year and up) - Black theme
                 $content = [
                     'badge' => 'ACCOUNT READY',
                     'title' => 'Hello, Future Engineer!',
                     'subtitle' => 'Continue your engineering journey with seamless access to your academic records, grades, and class information.',
                     'greeting_line' => 'Hello ' . $recipientName . ',',
                     'intro_message' => 'Your COEDIGO account has been set up. Sign in to view your grades, track attendance, and stay updated with your academic progress.',
-                    'gradient_start' => '#d1fae5',
-                    'gradient_end' => '#a7f3d0',
-                    'accent_color' => '#047857',
-                    'border_color' => '#6ee7b7',
-                    'card_bg' => '#ecfdf5',
-                    'button_bg' => '#059669',
+                    'gradient_start' => 'rgba(0, 0, 0, 0.85)',
+                    'gradient_end' => 'rgba(255, 140, 0, 0.75)',
+                    'accent_color' => '#ff8c00',
+                    'border_color' => '#ff8c00',
+                    'card_bg' => '#fff5e6',
+                    'button_bg' => '#000000',
+                    'text_color' => '#ffffff',
                 ];
             }
         } elseif ($role === 'faculty') {
@@ -226,12 +242,13 @@ class Mailer {
                 'subtitle' => 'Your teaching portal is ready. Manage class records, encode grades, track attendance, and monitor student performance with ease.',
                 'greeting_line' => 'Dear Professor ' . $recipientName . ',',
                 'intro_message' => 'Your faculty account has been created. Access your classes, manage grade books, and streamline your academic responsibilities through COEDIGO.',
-                'gradient_start' => '#fef3c7',
-                'gradient_end' => '#fde68a',
-                'accent_color' => '#b45309',
-                'border_color' => '#fcd34d',
-                'card_bg' => '#fffbeb',
-                'button_bg' => '#d97706',
+                'gradient_start' => 'rgba(255, 140, 0, 0.90)',
+                'gradient_end' => 'rgba(0, 0, 0, 0.90)',
+                'accent_color' => '#ff8c00',
+                'border_color' => '#ff8c00',
+                'card_bg' => '#fff5e6',
+                'button_bg' => '#ff8c00',
+                'text_color' => '#ffffff',
             ];
         } elseif ($role === 'dean') {
             $content = [
@@ -240,12 +257,13 @@ class Mailer {
                 'subtitle' => 'Your administrative dashboard awaits. Oversee college operations, monitor academic performance, and manage institutional records.',
                 'greeting_line' => 'Dear Dean ' . $recipientName . ',',
                 'intro_message' => 'Your Dean account is now active. Access comprehensive reports, verify grades, and oversee the academic excellence of the College of Engineering.',
-                'gradient_start' => '#e9d5ff',
-                'gradient_end' => '#d8b4fe',
-                'accent_color' => '#7c3aed',
-                'border_color' => '#c4b5fd',
-                'card_bg' => '#faf5ff',
-                'button_bg' => '#8b5cf6',
+                'gradient_start' => 'rgba(0, 0, 0, 0.90)',
+                'gradient_end' => 'rgba(255, 140, 0, 0.80)',
+                'accent_color' => '#ff8c00',
+                'border_color' => '#ff8c00',
+                'card_bg' => '#fff5e6',
+                'button_bg' => '#000000',
+                'text_color' => '#ffffff',
             ];
         } elseif ($role === 'program_chair') {
             $content = [
@@ -254,12 +272,13 @@ class Mailer {
                 'subtitle' => 'Lead your program with confidence. Monitor curriculum delivery, track student progress, and ensure academic quality across your department.',
                 'greeting_line' => 'Dear Program Chair ' . $recipientName . ',',
                 'intro_message' => 'Your Program Chair account is ready. Access program-wide analytics, review class records, and guide your department toward excellence.',
-                'gradient_start' => '#fce7f3',
-                'gradient_end' => '#fbcfe8',
-                'accent_color' => '#be185d',
-                'border_color' => '#f9a8d4',
-                'card_bg' => '#fdf2f8',
-                'button_bg' => '#db2777',
+                'gradient_start' => 'rgba(255, 140, 0, 0.88)',
+                'gradient_end' => 'rgba(0, 0, 0, 0.88)',
+                'accent_color' => '#ff8c00',
+                'border_color' => '#ff8c00',
+                'card_bg' => '#fff5e6',
+                'button_bg' => '#ff8c00',
+                'text_color' => '#ffffff',
             ];
         } else {
             // Default for admin or other roles
@@ -269,12 +288,13 @@ class Mailer {
                 'subtitle' => 'Your account has been created for ' . $collegeName . ' at ' . $institutionName . '. Access your portal to get started.',
                 'greeting_line' => 'Hello ' . $recipientName . ',',
                 'intro_message' => 'Your account has been successfully created. Use the credentials below to sign in and explore the system.',
-                'gradient_start' => '#fff7ed',
-                'gradient_end' => '#fed7aa',
-                'accent_color' => '#c2410c',
-                'border_color' => '#fdba74',
-                'card_bg' => '#fff7ed',
-                'button_bg' => '#ea580c',
+                'gradient_start' => 'rgba(0, 0, 0, 0.85)',
+                'gradient_end' => 'rgba(255, 140, 0, 0.85)',
+                'accent_color' => '#ff8c00',
+                'border_color' => '#ff8c00',
+                'card_bg' => '#fff5e6',
+                'button_bg' => '#ff8c00',
+                'text_color' => '#ffffff',
             ];
         }
 

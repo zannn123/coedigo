@@ -115,6 +115,10 @@ elseif ($path === '/api/subjects' && $method === 'POST') {
     require_once __DIR__ . '/controllers/SubjectController.php';
     (new SubjectController())->create();
 }
+elseif ($path === '/api/subjects/programs' && $method === 'GET') {
+    require_once __DIR__ . '/controllers/SubjectController.php';
+    (new SubjectController())->programs();
+}
 elseif (preg_match('#^/api/subjects/(\d+)$#', $path, $m) && $method === 'PUT') {
     require_once __DIR__ . '/controllers/SubjectController.php';
     (new SubjectController())->update($m[1]);
@@ -123,11 +127,11 @@ elseif (preg_match('#^/api/subjects/(\d+)$#', $path, $m) && $method === 'DELETE'
     require_once __DIR__ . '/controllers/SubjectController.php';
     (new SubjectController())->delete($m[1]);
 }
-elseif (preg_match('#^/api/subjects/(\d+)/approve$#', $path, $m) && $method === 'POST') {
+elseif (preg_match('#^/api/subjects/(\d+)/approve$#', $path, $m) && in_array($method, ['POST', 'PUT'], true)) {
     require_once __DIR__ . '/controllers/SubjectController.php';
     (new SubjectController())->approve($m[1]);
 }
-elseif (preg_match('#^/api/subjects/(\d+)/reject$#', $path, $m) && $method === 'POST') {
+elseif (preg_match('#^/api/subjects/(\d+)/(reject|cancel)$#', $path, $m) && in_array($method, ['POST', 'PUT'], true)) {
     require_once __DIR__ . '/controllers/SubjectController.php';
     (new SubjectController())->reject($m[1]);
 }

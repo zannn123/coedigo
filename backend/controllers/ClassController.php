@@ -64,6 +64,16 @@ class ClassController {
                   ->required('semester', $data['semester'] ?? '');
         if (!$validator->isValid()) Response::error('Validation failed.', 422, $validator->getErrors());
 
+        $subjectStmt = $this->db->prepare("SELECT id, approval_status FROM subjects WHERE id = ? AND is_active = 1");
+        $subjectStmt->execute([$data['subject_id']]);
+        $subject = $subjectStmt->fetch();
+        if (!$subject) {
+            Response::error('Subject not found.', 404);
+        }
+        if (($subject['approval_status'] ?? 'approved') !== 'approved') {
+            Response::error('Only approved subjects can be used to create class records.', 409);
+        }
+
         $stmt = $this->db->prepare("INSERT INTO class_records (subject_id, faculty_id, section, academic_year, semester, schedule, room, max_students) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$data['subject_id'], $auth['sub'], $data['section'], $data['academic_year'], $data['semester'], $data['schedule'] ?? null, $data['room'] ?? null, $data['max_students'] ?? 50]);
         $newId = (int)$this->db->lastInsertId();

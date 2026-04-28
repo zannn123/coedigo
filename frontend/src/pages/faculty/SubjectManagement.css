@@ -1,0 +1,205 @@
+.subject-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 0.5rem;
+  background: var(--bg-secondary);
+  padding: 0.25rem;
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.filter-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.filter-tab.active {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.tab-count {
+  background: rgba(255, 255, 255, 0.3);
+  padding: 0.125rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.status-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.status-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 8px;
+  border: 2px solid;
+  transition: all 0.2s;
+}
+
+.status-summary-card.pending {
+  background: var(--warning-bg);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.status-summary-card.approved {
+  background: var(--success-bg);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.status-summary-card.rejected {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.summary-count {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.summary-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-pending {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border: 1px solid var(--warning);
+}
+
+.status-approved {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.status-rejected {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.rejection-subject-info {
+  background: var(--bg-secondary);
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid var(--danger);
+}
+
+.rejection-code {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.25rem;
+}
+
+.rejection-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.btn-success {
+  background: var(--success);
+  color: #fff;
+}
+
+.btn-success:hover {
+  filter: brightness(0.92);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  filter: brightness(0.92);
+}
+
+.subject-live-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.field-hint {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .subject-filters {
+    align-items: stretch;
+  }
+
+  .filter-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  
+  .filter-tab {
+    white-space: nowrap;
+  }
+  
+  .status-summary-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .subject-live-sync {
+    width: 100%;
+  }
+}

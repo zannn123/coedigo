@@ -21,9 +21,9 @@ import './GradeBook.css';
 
 const CATEGORY_ORDER = ['major_exam', 'quiz', 'project'];
 const CATEGORY_LABELS = {
-  major_exam: 'Major Exams (30%)',
-  quiz: 'Quizzes (30%)',
-  project: 'Performance Tasks (40%)',
+  major_exam: 'Major Exams',
+  quiz: 'Quizzes',
+  project: 'Performance Tasks',
 };
 const CATEGORY_SHORT_LABELS = {
   major_exam: 'Exam',
@@ -33,12 +33,10 @@ const CATEGORY_SHORT_LABELS = {
 const PERIODS = ['midterm', 'final'];
 const PERIOD_LABELS = { midterm: 'Midterm', final: 'Final' };
 const TERM_GRADE_SHORT_LABELS = { midterm: 'MG', final: 'FG' };
-const CLASS_RECORD_WEIGHTS = {
-  major_exam: 0.30,
-  quiz: 0.30,
-  performance_category: 0.40, // Total for Performance Category (PT + Attendance)
-  // Performance Task Weight = 0.40 - Attendance Weight
-  // Attendance Weight is customizable by instructor
+const DEFAULT_GRADING_WEIGHTS = {
+  major_exam: 30,
+  quiz: 30,
+  project: 40,
 };
 
 
@@ -118,6 +116,36 @@ function formatRecordNumber(value, digits = 0) {
   return numeric.toFixed(digits);
 }
 
+function formatWeightPercent(value, digits = 1) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '0';
+  return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(digits).replace(/\.0$/, '');
+}
+
+function settingsRowsToMap(rows) {
+  const map = {};
+  ensureArray(rows).forEach(setting => {
+    if (setting?.setting_key) {
+      map[setting.setting_key] = setting.setting_value;
+    }
+  });
+  return map;
+}
+
+function normalizeWeight(value, fallback) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : fallback;
+}
+
+function normalizeGradingWeights(rows) {
+  const settings = settingsRowsToMap(rows);
+  return {
+    major_exam: normalizeWeight(settings.major_exam_weight, DEFAULT_GRADING_WEIGHTS.major_exam),
+    quiz: normalizeWeight(settings.quiz_weight, DEFAULT_GRADING_WEIGHTS.quiz),
+    project: normalizeWeight(settings.project_weight, DEFAULT_GRADING_WEIGHTS.project),
+  };
+}
+
 function numericScore(value) {
   if (value === '' || value === null || value === undefined) return null;
   const numeric = Number(value);
@@ -131,6 +159,38 @@ function transmutedScore(score, maxScore) {
     return null;
   }
   return ((numericScoreValue / numericMaxScore) * 50) + 50;
+}
+
+function performanceTaskAverage(columns, scoreFor) {
+  const values = [];
+  let subtotalScore = 0;
+  let subtotalMax = 0;
+
+  columns
+    .filter(column => column.category === 'project')
+    .forEach(column => {
+      const score = numericScore(scoreFor(column));
+      const maxScore = Number(column.max_score);
+
+      if (score === null || !Number.isFinite(maxScore) || maxScore <= 0) {
+        return;
+      }
+
+      if (maxScore < 100) {
+        subtotalScore += score;
+        subtotalMax += maxScore;
+        return;
+      }
+
+      values.push((score / maxScore) * 100);
+    });
+
+  const subtotalGrade = subtotalMax > 0 ? transmutedScore(subtotalScore, subtotalMax) : null;
+  if (subtotalGrade !== null) {
+    values.unshift(subtotalGrade);
+  }
+
+  return averageValues(values);
 }
 
 function averageValues(values) {
@@ -365,6 +425,7 @@ export default function GradeBook() {
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [toast, setToast] = useState(null);
   const [attendanceWeight, setAttendanceWeight] = useState(5);
+  const [gradingWeights, setGradingWeights] = useState(DEFAULT_GRADING_WEIGHTS);
   const [showAttendanceSettings, setShowAttendanceSettings] = useState(false);
   const [savingAttendanceWeight, setSavingAttendanceWeight] = useState(false);
   const [termGradesUnlocked, setTermGradesUnlocked] = useState(false);
@@ -387,9 +448,10 @@ export default function GradeBook() {
     setLoadError('');
 
     try {
-      const [classResponse, gradesResponse] = await Promise.all([
+      const [classResponse, gradesResponse, settingsResponse] = await Promise.all([
         api.get(`/classes/${classId}`),
         api.get(`/grades/class/${classId}`),
+        api.get('/settings').catch(() => ({ data: { data: [] } })),
       ]);
       const gradePayload = gradesResponse.data?.data;
       const students = ensureArray(Array.isArray(gradePayload) ? gradePayload : gradePayload?.students).map(normalizeGradeStudent);
@@ -397,6 +459,7 @@ export default function GradeBook() {
       const fetchedClassData = classResponse.data?.data || null;
 
       setClassData(fetchedClassData);
+      setGradingWeights(normalizeGradingWeights(settingsResponse.data?.data));
       setAttendanceWeight(fetchedClassData?.attendance_weight ?? 5);
       setTermGradesUnlocked(previous => previous || fetchedClassData?.grade_status !== 'draft');
       setGrades(students);
@@ -1154,9 +1217,14 @@ export default function GradeBook() {
   };
 
   const saveAttendanceWeight = async () => {
+    const nextAttendanceWeight = Math.max(0, Math.min(Number(attendanceWeight) || 0, gradingWeights.project));
+    if (nextAttendanceWeight !== Number(attendanceWeight)) {
+      setAttendanceWeight(nextAttendanceWeight);
+    }
+
     setSavingAttendanceWeight(true);
     try {
-      await api.put(`/classes/${classId}`, { attendance_weight: attendanceWeight });
+      await api.put(`/classes/${classId}`, { attendance_weight: nextAttendanceWeight });
       await api.post(`/grades/compute-class/${classId}`);
       
       // Update only the class data and grades without full reload
@@ -1165,7 +1233,7 @@ export default function GradeBook() {
       const students = ensureArray(Array.isArray(gradePayload) ? gradePayload : gradePayload?.students).map(normalizeGradeStudent);
       
       setGrades(students);
-      setClassData(prev => prev ? { ...prev, attendance_weight: attendanceWeight } : prev);
+      setClassData(prev => prev ? { ...prev, attendance_weight: nextAttendanceWeight } : prev);
       setShowAttendanceSettings(false);
       showToast('Attendance weight updated successfully.');
     } catch (error) {
@@ -1216,6 +1284,14 @@ export default function GradeBook() {
     + 6;
 
   const shouldShowTermGrade = Boolean(classData && (classData.grade_status !== 'draft' || termGradesUnlocked));
+  const examWeightPercent = gradingWeights.major_exam;
+  const quizWeightPercent = gradingWeights.quiz;
+  const performanceCategoryPercent = gradingWeights.project;
+  const effectiveAttendanceWeight = Math.max(0, Math.min(Number(attendanceWeight) || 0, performanceCategoryPercent));
+  const performanceTaskWeightPercent = Math.max(0, performanceCategoryPercent - effectiveAttendanceWeight);
+  const attendanceSliderPercent = performanceCategoryPercent > 0
+    ? (effectiveAttendanceWeight / performanceCategoryPercent) * 100
+    : 0;
 
   const calculateTermRecord = (student, period) => {
     const periodColumns = assessmentColumns.filter(column => column.period === period);
@@ -1236,17 +1312,17 @@ export default function GradeBook() {
 
     const examAverage = categoryAverage('major_exam');
     const quizAverage = categoryAverage('quiz');
-    const projectAverage = categoryAverage('project');
+    const projectAverage = performanceTaskAverage(periodColumns, scoreFor);
     
     // Calculate the custom attendance weight as a decimal (e.g., 5% = 0.05, 2% = 0.02)
-    const customAttendanceWeight = Number(attendanceWeight) / 100;
+    const customAttendanceWeight = effectiveAttendanceWeight / 100;
     
-    // Performance Task Weight = 40% - Attendance Weight
-    const performanceTaskWeight = CLASS_RECORD_WEIGHTS.performance_category - customAttendanceWeight;
+    // Performance Task Weight = admin Performance Category weight - Attendance Weight
+    const performanceTaskWeight = performanceTaskWeightPercent / 100;
     
-    // Apply fixed weights for exam and quiz
-    const examContribution = examAverage !== null ? examAverage * CLASS_RECORD_WEIGHTS.major_exam : null;
-    const quizContribution = quizAverage !== null ? quizAverage * CLASS_RECORD_WEIGHTS.quiz : null;
+    // Apply admin-configured weights for exam and quiz
+    const examContribution = examAverage !== null ? examAverage * (examWeightPercent / 100) : null;
+    const quizContribution = quizAverage !== null ? quizAverage * (quizWeightPercent / 100) : null;
     
     // Apply dynamic performance task weight (40% - attendance weight)
     const projectContribution = projectAverage !== null ? projectAverage * performanceTaskWeight : null;
@@ -1278,7 +1354,8 @@ export default function GradeBook() {
       examAverage,
       quizAverage,
       projectAverage,
-      performanceTaskWeight, // Dynamic weight
+      performanceTaskWeight,
+      performanceTaskWeightPercent,
       examContribution,
       quizContribution,
       projectContribution,
@@ -1403,8 +1480,8 @@ export default function GradeBook() {
         <div className="gradebook-attendance-credit" role="status" aria-live="polite">
           <Info size={18} aria-hidden="true" />
           <div style={{ flex: 1 }}>
-            <strong>Performance Category (40%) = Performance Task ({40 - attendanceWeight}%) + Attendance ({attendanceWeight}%)</strong>
-            <span>Formula: (30% Quiz) + (30% Exam) + ({40 - attendanceWeight}% PT) + ({attendanceWeight}% Attendance) = 100%. Attendance Grade = 50 + (Present / Total) × 50</span>
+            <strong>Performance Category ({formatWeightPercent(performanceCategoryPercent)}%) = Performance Task ({formatWeightPercent(performanceTaskWeightPercent)}%) + Attendance ({formatWeightPercent(effectiveAttendanceWeight)}%)</strong>
+            <span>Formula: ({formatWeightPercent(quizWeightPercent)}% Quiz) + ({formatWeightPercent(examWeightPercent)}% Exam) + ({formatWeightPercent(performanceTaskWeightPercent)}% PT) + ({formatWeightPercent(effectiveAttendanceWeight)}% Attendance). Attendance Grade = 50 + (Present / Total) x 50</span>
           </div>
           <button
             className="btn btn-ghost btn-sm"
@@ -1454,9 +1531,9 @@ export default function GradeBook() {
                 </tr>
                 <tr className="gradebook-group-row">
                   <th colSpan={2} className="gradebook-category gradebook-category-attendance">Attendance</th>
-                  <th colSpan={visibleColumnsByCategory.project.length + 1} className="gradebook-category gradebook-category-project">Performance (40%: PT + AT)</th>
-                  <th colSpan={visibleColumnsByCategory.quiz.length + 1} className="gradebook-category gradebook-category-quiz">Quiz</th>
-                  <th colSpan={visibleColumnsByCategory.major_exam.length + 1} className="gradebook-category gradebook-category-major_exam">{activeTab === 'midterm' ? 'Mid Ex' : 'Final Ex'}</th>
+                  <th colSpan={visibleColumnsByCategory.project.length + 1} className="gradebook-category gradebook-category-project">Performance ({formatWeightPercent(performanceCategoryPercent)}%: PT + AT)</th>
+                  <th colSpan={visibleColumnsByCategory.quiz.length + 1} className="gradebook-category gradebook-category-quiz">Quiz ({formatWeightPercent(quizWeightPercent)}%)</th>
+                  <th colSpan={visibleColumnsByCategory.major_exam.length + 1} className="gradebook-category gradebook-category-major_exam">{activeTab === 'midterm' ? 'Mid Ex' : 'Final Ex'} ({formatWeightPercent(examWeightPercent)}%)</th>
                   <th colSpan={6} className="gradebook-category gradebook-category-term-grade">{PERIOD_LABELS[activeTab]} Grade</th>
                 </tr>
                 <tr>
@@ -1498,10 +1575,10 @@ export default function GradeBook() {
                     </th>
                   ))}
                   <th className="gradebook-assessment-header gradebook-record-summary-header">AVE</th>
-                  <th className="gradebook-assessment-header gradebook-record-summary-header">{Math.round((40 - attendanceWeight) * 10) / 10}%PT</th>
-                  <th className="gradebook-assessment-header gradebook-record-summary-header">30%Q</th>
-                  <th className="gradebook-assessment-header gradebook-record-summary-header">30%ME</th>
-                  <th className="gradebook-assessment-header gradebook-record-summary-header">{attendanceWeight}%AT</th>
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">{formatWeightPercent(performanceTaskWeightPercent)}%PT</th>
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">{formatWeightPercent(quizWeightPercent)}%Q</th>
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">{formatWeightPercent(examWeightPercent)}%ME</th>
+                  <th className="gradebook-assessment-header gradebook-record-summary-header">{formatWeightPercent(effectiveAttendanceWeight)}%AT</th>
                   <th className="gradebook-assessment-header gradebook-record-grade-header">{TERM_GRADE_SHORT_LABELS[activeTab]}</th>
                   <th className="gradebook-assessment-header gradebook-record-grade-header">{TERM_GRADE_SHORT_LABELS[activeTab]}%</th>
                 </tr>
@@ -1614,7 +1691,12 @@ export default function GradeBook() {
 
                   return (
                     <>
-                      <td className="gradebook-record-value">{termRecord.attendanceMeetings || '--'}</td>
+                      <td
+                        className="gradebook-record-value"
+                        title={termRecord.attendanceMeetings > 0 ? `${termRecord.attendanceCount} present out of ${termRecord.attendanceMeetings} meeting(s)` : 'No attendance recorded'}
+                      >
+                        {termRecord.attendanceMeetings > 0 ? termRecord.attendanceCount : '--'}
+                      </td>
                       <td className="gradebook-record-value gradebook-record-average">{formatRecordNumber(termRecord.attendanceGrade)}</td>
                       {renderScoreCells(visibleColumnsByCategory.project)}
                       <td className="gradebook-record-value gradebook-record-average">{formatRecordNumber(termRecord.projectAverage)}</td>
@@ -1622,9 +1704,9 @@ export default function GradeBook() {
                       <td className="gradebook-record-value gradebook-record-average">{formatRecordNumber(termRecord.quizAverage)}</td>
                       {renderScoreCells(visibleColumnsByCategory.major_exam)}
                       <td className="gradebook-record-value gradebook-record-average">{formatRecordNumber(termRecord.examAverage)}</td>
-                      <td className="gradebook-record-value gradebook-record-weighted">{formatRecordNumber(termRecord.examContribution)}</td>
-                      <td className="gradebook-record-value gradebook-record-weighted">{formatRecordNumber(termRecord.quizContribution)}</td>
                       <td className="gradebook-record-value gradebook-record-weighted">{formatRecordNumber(termRecord.projectContribution)}</td>
+                      <td className="gradebook-record-value gradebook-record-weighted">{formatRecordNumber(termRecord.quizContribution)}</td>
+                      <td className="gradebook-record-value gradebook-record-weighted">{formatRecordNumber(termRecord.examContribution)}</td>
                       <td className="gradebook-record-value gradebook-record-weighted">{formatRecordNumber(termRecord.attendanceContribution)}</td>
                       <td className="gradebook-record-value gradebook-record-term-grade" style={{ color: shouldShowTermGrade ? getFinalGradeColor(termRecord.termGrade) : 'var(--text-muted)' }}>
                         {shouldShowTermGrade && termRecord.termGrade !== null ? termRecord.termGrade.toFixed(2) : '--'}
@@ -1981,7 +2063,7 @@ export default function GradeBook() {
             <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
               <div>
                 <h2 style={{ marginBottom: '0.5rem' }}>Attendance Weight (Inside Performance Category)</h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0 }}>Set attendance weight. Performance Task weight will auto-adjust to maintain 40% total.</p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0 }}>Set attendance weight. Performance Task weight will auto-adjust to maintain the admin-configured performance category.</p>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowAttendanceSettings(false)} disabled={savingAttendanceWeight}><X size={18} /></button>
             </div>
@@ -1993,15 +2075,15 @@ export default function GradeBook() {
                   <input
                     type="number"
                     min="0"
-                    max="10"
+                    max={performanceCategoryPercent}
                     step="1"
-                    value={attendanceWeight}
-                    onChange={e => setAttendanceWeight(Math.max(0, Math.min(10, Number(e.target.value))))}
+                    value={effectiveAttendanceWeight}
+                    onChange={e => setAttendanceWeight(Math.max(0, Math.min(performanceCategoryPercent, Number(e.target.value))))}
                     className="input-field"
                     style={{ width: '80px', textAlign: 'center', padding: '0.5rem' }}
                     disabled={savingAttendanceWeight}
                   />
-                  <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent)', minWidth: '60px' }}>{attendanceWeight}%</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent)', minWidth: '60px' }}>{formatWeightPercent(effectiveAttendanceWeight)}%</span>
                 </div>
               </div>
 
@@ -2009,25 +2091,25 @@ export default function GradeBook() {
                 id="attendance-weight-slider"
                 type="range"
                 min="0"
-                max="100"
-                step="5"
-                value={attendanceWeight}
+                max={performanceCategoryPercent}
+                step="1"
+                value={effectiveAttendanceWeight}
                 onChange={e => setAttendanceWeight(Number(e.target.value))}
                 disabled={savingAttendanceWeight}
                 style={{
                   width: '100%',
                   height: '8px',
                   borderRadius: '4px',
-                  background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${attendanceWeight}%, var(--bg-elevated) ${attendanceWeight}%, var(--bg-elevated) 100%)`,
+                  background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${attendanceSliderPercent}%, var(--bg-elevated) ${attendanceSliderPercent}%, var(--bg-elevated) 100%)`,
                   outline: 'none',
                   cursor: 'pointer'
                 }}
               />
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                <span>0% (PT=40%)</span>
-                <span>5% (PT=35%)</span>
-                <span>10% (PT=30%)</span>
+                <span>0% (PT={formatWeightPercent(performanceCategoryPercent)}%)</span>
+                <span>{formatWeightPercent(effectiveAttendanceWeight)}% (PT={formatWeightPercent(performanceTaskWeightPercent)}%)</span>
+                <span>{formatWeightPercent(performanceCategoryPercent)}% (PT=0%)</span>
               </div>
             </div>
 
@@ -2035,13 +2117,13 @@ export default function GradeBook() {
               <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                 <strong style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Current Breakdown:</strong>
                 <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-                  <li>Quiz: <strong>30%</strong> (fixed)</li>
-                  <li>Exam: <strong>30%</strong> (fixed)</li>
-                  <li>Performance Task: <strong>{40 - attendanceWeight}%</strong> (auto-adjusted)</li>
-                  <li>Attendance: <strong>{attendanceWeight}%</strong> (customizable)</li>
-                  <li style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>Total: <strong>100%</strong></li>
+                  <li>Quiz: <strong>{formatWeightPercent(quizWeightPercent)}%</strong> (admin setting)</li>
+                  <li>Exam: <strong>{formatWeightPercent(examWeightPercent)}%</strong> (admin setting)</li>
+                  <li>Performance Task: <strong>{formatWeightPercent(performanceTaskWeightPercent)}%</strong> (auto-adjusted)</li>
+                  <li>Attendance: <strong>{formatWeightPercent(effectiveAttendanceWeight)}%</strong> (customizable)</li>
+                  <li style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>Configured Total: <strong>{formatWeightPercent(examWeightPercent + quizWeightPercent + performanceCategoryPercent)}%</strong></li>
                 </ul>
-                <p style={{ margin: '0.75rem 0 0', fontSize: '0.75rem', fontStyle: 'italic' }}>Performance Category = PT ({40 - attendanceWeight}%) + Attendance ({attendanceWeight}%) = 40%</p>
+                <p style={{ margin: '0.75rem 0 0', fontSize: '0.75rem', fontStyle: 'italic' }}>Performance Category = PT ({formatWeightPercent(performanceTaskWeightPercent)}%) + Attendance ({formatWeightPercent(effectiveAttendanceWeight)}%) = {formatWeightPercent(performanceCategoryPercent)}%</p>
               </div>
             </div>
 

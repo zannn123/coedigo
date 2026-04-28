@@ -2,6 +2,8 @@
 
 Complete documentation for the COEDIGO system.
 
+**Quick Visual Guide:** [DOCUMENTATION_MAP.md](DOCUMENTATION_MAP.md) 🗺️
+
 ---
 
 ## 📖 Table of Contents
@@ -13,10 +15,11 @@ Complete documentation for the COEDIGO system.
 
 ### ✨ Features
 1. **[Attendance Weight](features/ATTENDANCE_WEIGHT.md)** - Customizable attendance grading
-2. **[Grade Computation](features/GRADE_COMPUTATION.md)** - How grades are calculated
-3. **[User Roles & Permissions](features/USER_ROLES.md)** - Access control
-4. **[Class Management](features/CLASS_MANAGEMENT.md)** - Creating and managing classes
-5. **[Grade Book](features/GRADEBOOK.md)** - Score encoding interface
+2. **[Subject Approval](features/SUBJECT_APPROVAL.md)** - Subject approval workflow
+3. **[GradeBook Changelog](features/GRADEBOOK_CHANGELOG.md)** - Complete history of gradebook improvements
+4. **[Email Templates](features/EMAIL_TEMPLATES.md)** - Professional email designs with orange/black theme
+5. **[Grade Computation](features/GRADE_COMPUTATION.md)** - How grades are calculated (coming soon)
+6. **[User Roles & Permissions](features/USER_ROLES.md)** - Access control (coming soon)
 
 ### 🏗️ Architecture
 1. **[System Overview](architecture/SYSTEM_OVERVIEW.md)** - High-level architecture
@@ -34,11 +37,11 @@ Complete documentation for the COEDIGO system.
 6. **[Reports API](api/REPORTS.md)** - Excel exports
 
 ### 🐛 Troubleshooting
-1. **[Common Issues](troubleshooting/COMMON_ISSUES.md)** - FAQ and solutions
-2. **[Database Errors](troubleshooting/DATABASE_ERRORS.md)** - Connection and driver issues
-3. **[Save Failures](troubleshooting/SAVE_FAILURES.md)** - Score saving problems
-4. **[Frontend Errors](troubleshooting/FRONTEND_ERRORS.md)** - React and build issues
-5. **[Backend Errors](troubleshooting/BACKEND_ERRORS.md)** - PHP and API issues
+1. **[Database Errors](troubleshooting/DATABASE_ERRORS.md)** - Connection and driver issues
+2. **[Save Failures](troubleshooting/SAVE_FAILURES.md)** - Score saving problems
+3. **[Common Issues](troubleshooting/COMMON_ISSUES.md)** - FAQ and solutions (coming soon)
+4. **[Frontend Errors](troubleshooting/FRONTEND_ERRORS.md)** - React and build issues (coming soon)
+5. **[Backend Errors](troubleshooting/BACKEND_ERRORS.md)** - PHP and API issues (coming soon)
 
 ---
 
@@ -53,10 +56,11 @@ docs/
 │
 ├── features/                 # Feature documentation
 │   ├── ATTENDANCE_WEIGHT.md # Attendance customization
-│   ├── GRADE_COMPUTATION.md # Grading algorithm
-│   ├── USER_ROLES.md        # Roles and permissions
-│   ├── CLASS_MANAGEMENT.md  # Class operations
-│   └── GRADEBOOK.md         # Grade book interface
+│   ├── SUBJECT_APPROVAL.md  # Subject approval workflow
+│   ├── GRADEBOOK_CHANGELOG.md # Gradebook improvements history
+│   ├── EMAIL_TEMPLATES.md   # Professional email designs
+│   ├── GRADE_COMPUTATION.md # Grading algorithm (coming soon)
+│   └── USER_ROLES.md        # Roles and permissions (coming soon)
 │
 ├── architecture/             # System design
 │   ├── SYSTEM_OVERVIEW.md   # Architecture overview
@@ -74,11 +78,11 @@ docs/
 │   └── REPORTS.md           # Report endpoints
 │
 └── troubleshooting/          # Debug guides
-    ├── COMMON_ISSUES.md     # FAQ
     ├── DATABASE_ERRORS.md   # DB issues
     ├── SAVE_FAILURES.md     # Save problems
-    ├── FRONTEND_ERRORS.md   # React issues
-    └── BACKEND_ERRORS.md    # PHP issues
+    ├── COMMON_ISSUES.md     # FAQ (coming soon)
+    ├── FRONTEND_ERRORS.md   # React issues (coming soon)
+    └── BACKEND_ERRORS.md    # PHP issues (coming soon)
 ```
 
 ---
@@ -100,9 +104,9 @@ docs/
 - Troubleshooting: [Common Issues](troubleshooting/COMMON_ISSUES.md)
 
 ### For Faculty
-- Grade Book: [Gradebook Guide](features/GRADEBOOK.md)
 - Attendance: [Attendance Weight](features/ATTENDANCE_WEIGHT.md)
-- Classes: [Class Management](features/CLASS_MANAGEMENT.md)
+- GradeBook: [Changelog](features/GRADEBOOK_CHANGELOG.md)
+- Troubleshooting: [Save Failures](troubleshooting/SAVE_FAILURES.md)
 
 ---
 
@@ -179,10 +183,11 @@ code here
 
 ### Features
 - ✅ Attendance Weight
-- ✅ Grade Computation
-- ✅ User Roles
-- ⏳ Class Management (coming soon)
-- ⏳ Gradebook (coming soon)
+- ✅ Subject Approval
+- ✅ GradeBook Changelog
+- ✅ Email Templates
+- ⏳ Grade Computation (coming soon)
+- ⏳ User Roles (coming soon)
 
 ### Architecture
 - ✅ System Overview
@@ -194,9 +199,9 @@ code here
 - ⏳ All endpoints (coming soon)
 
 ### Troubleshooting
-- ✅ Common Issues
 - ✅ Database Errors
 - ✅ Save Failures
+- ⏳ Common Issues (coming soon)
 - ⏳ Frontend Errors (coming soon)
 - ⏳ Backend Errors (coming soon)
 
