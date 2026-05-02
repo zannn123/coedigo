@@ -1,31 +1,62 @@
+.dashboard-layout:has(.faculty-operations-page) {
+  --faculty-page-gradient:
+    radial-gradient(
+      circle at 50% 0%,
+      color-mix(in srgb, var(--accent-light) 60%, transparent) 0%,
+      transparent 80%
+    );
+}
+
 .faculty-operations-page {
-  --faculty-bg: #111111;
-  --faculty-panel: #181818;
-  --faculty-panel-strong: #1F1A15;
-  --faculty-panel-warm: #2A1E14;
-  --faculty-border: rgba(255, 255, 255, 0.13);
-  --faculty-border-strong: rgba(255, 147, 47, 0.38);
-  --faculty-accent: #FF932F;
-  --faculty-accent-strong: #FFAD5A;
-  --faculty-blue: #3487FF;
-  --faculty-green: #35D07F;
-  --faculty-yellow: #F5A400;
-  --faculty-red: #FF4D57;
-  --faculty-text: #F7F7F7;
-  --faculty-secondary: #C8C8C8;
-  --faculty-muted: #8A8A8A;
+  --faculty-panel: var(--bg-surface);
+  --faculty-border: color-mix(in srgb, var(--border) 86%, var(--accent) 14%);
+  --faculty-border-strong: color-mix(in srgb, var(--accent) 42%, var(--border));
+  --faculty-accent: var(--accent);
+  --faculty-accent-text: var(--accent-hover);
+  --faculty-action-bg: linear-gradient(
+    135deg,
+    var(--accent-hover),
+    color-mix(in srgb, var(--accent-hover) 82%, var(--text-primary))
+  );
+  --faculty-on-accent: var(--text-on-accent);
+  --faculty-blue: var(--info);
+  --faculty-green: var(--success);
+  --faculty-yellow: var(--warning);
+  --faculty-red: var(--danger);
+  --faculty-text: var(--text-primary);
+  --faculty-secondary: var(--text-secondary);
+  --faculty-muted: var(--text-muted);
+  --faculty-subtle: color-mix(in srgb, var(--bg-elevated) 76%, var(--bg-surface));
+  --faculty-accent-soft: color-mix(in srgb, var(--accent-light) 72%, var(--bg-surface));
+  --faculty-accent-tint: color-mix(in srgb, var(--accent-light) 58%, var(--bg-surface));
+  --faculty-danger-soft: var(--danger-bg);
+  --faculty-danger-tint: color-mix(in srgb, var(--danger-bg) 68%, var(--bg-surface));
+  --faculty-danger-text: var(--danger);
+  --faculty-warning-soft: var(--warning-bg);
+  --faculty-warning-tint: color-mix(in srgb, var(--warning-bg) 72%, var(--bg-surface));
+  --faculty-warning-text: color-mix(in srgb, var(--warning) 72%, var(--text-primary));
+  --faculty-meter-bg: color-mix(in srgb, var(--border) 76%, transparent);
+  --faculty-card-shadow: var(--shadow-sm);
+  --faculty-card-shadow-strong: var(--shadow-md);
+  --faculty-chart-bg: color-mix(in srgb, var(--accent-light) 48%, var(--bg-surface));
+  --faculty-chart-grid: color-mix(in srgb, var(--border-light) 68%, transparent);
+  --faculty-chart-reference: color-mix(in srgb, var(--accent) 36%, transparent);
+  --faculty-chart-cursor: color-mix(in srgb, var(--accent) 28%, transparent);
+  --faculty-chart-border: color-mix(in srgb, var(--accent) 18%, var(--border));
+  --faculty-tooltip-bg: var(--dropdown-bg);
   min-height: calc(100vh - 60px);
   margin: -1.75rem -2rem;
   padding: 1.35rem 2rem 2rem;
-  background:
-    radial-gradient(circle at 20% -8%, rgba(255, 147, 47, 0.14), transparent 30%),
-    linear-gradient(180deg, #101010 0%, #111111 46%, #0E0E0E 100%);
+  background: transparent;
   color: var(--faculty-text);
 }
 
-.dashboard-layout:has(.faculty-operations-page) .main-area,
+.dashboard-layout:has(.faculty-operations-page) .main-area {
+  background: var(--faculty-page-gradient);
+}
+
 .dashboard-layout:has(.faculty-operations-page) .main-content {
-  background: #101010;
+  background: transparent;
 }
 
 .dashboard-layout:has(.faculty-operations-page) .main-content {
@@ -33,16 +64,18 @@
 }
 
 .dashboard-layout:has(.faculty-operations-page) .topbar {
-  background: linear-gradient(180deg, rgba(16, 16, 16, 0.98), rgba(16, 16, 16, 0.9));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
+  background: color-mix(in srgb, var(--topbar-bg) 75%, transparent);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
 }
 
 .dashboard-layout:has(.faculty-operations-page) .topbar-title {
-  color: var(--faculty-text);
+  color: var(--text-primary);
 }
 
 .dashboard-layout:has(.faculty-operations-page) .topbar::after {
-  background: linear-gradient(90deg, transparent, rgba(255, 147, 47, 0.28), transparent);
+  background: transparent;
 }
 
 .faculty-ops-shell {
@@ -77,7 +110,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  color: var(--faculty-accent);
+  color: var(--faculty-accent-text);
   font-size: 0.7rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -87,7 +120,7 @@
 .faculty-title-block h1 {
   margin: 0.35rem 0 0.15rem;
   color: var(--faculty-text);
-  font-size: clamp(1.4rem, 2vw, 1.8rem);
+  font-size: 1.75rem;
   line-height: 1.12;
 }
 
@@ -131,8 +164,8 @@
   min-height: 40px;
   border: 0;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--faculty-accent), var(--faculty-accent-strong));
-  color: #17110D;
+  background: var(--faculty-action-bg);
+  color: var(--faculty-on-accent);
   font-size: 0.78rem;
   font-weight: 800;
   padding: 0 1rem;
@@ -142,7 +175,7 @@
 .faculty-primary-action:hover,
 .faculty-warning-button:hover {
   filter: brightness(1.05);
-  box-shadow: 0 10px 28px rgba(255, 147, 47, 0.22);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .faculty-primary-action:focus-visible,
@@ -161,10 +194,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.65rem 0.8rem;
-  border: 1px solid rgba(245, 164, 0, 0.35);
+  border: 1px solid color-mix(in srgb, var(--warning) 36%, var(--border));
   border-radius: 10px;
-  background: rgba(245, 164, 0, 0.1);
-  color: #FFD188;
+  background: var(--faculty-warning-soft);
+  color: var(--faculty-warning-text);
   font-size: 0.8rem;
 }
 
@@ -178,9 +211,9 @@
 .faculty-panel,
 .faculty-record-chip {
   border: 1px solid var(--faculty-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)), var(--faculty-panel);
+  background: var(--faculty-panel);
   border-radius: 14px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--faculty-card-shadow);
 }
 
 .faculty-kpi-card {
@@ -221,7 +254,7 @@
 
 .faculty-kpi-card.tone-amber svg,
 .faculty-kpi-card.tone-amber strong {
-  color: var(--faculty-accent);
+  color: var(--faculty-accent-text);
 }
 
 .faculty-kpi-card.tone-blue svg,
@@ -231,7 +264,7 @@
 
 .faculty-kpi-card.tone-warning svg,
 .faculty-kpi-card.tone-warning strong {
-  color: var(--faculty-yellow);
+  color: var(--faculty-warning-text);
 }
 
 .faculty-kpi-card.tone-danger svg,
@@ -243,7 +276,7 @@
   height: 5px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.11);
+  background: var(--faculty-meter-bg);
 }
 
 .faculty-meter span {
@@ -262,11 +295,11 @@
 }
 
 .tone-warning .faculty-meter span {
-  color: #FFC568;
+  color: var(--faculty-yellow);
 }
 
 .tone-danger .faculty-meter span {
-  color: #FF8188;
+  color: var(--faculty-red);
 }
 
 .faculty-analytics-grid {
@@ -309,18 +342,15 @@
   gap: 0.25rem;
   border: 0;
   background: transparent;
-  color: var(--faculty-accent);
+  color: var(--faculty-accent-text);
 }
 
 .faculty-chart-frame {
   height: 178px;
   overflow: hidden;
-  border: 1px solid rgba(255, 147, 47, 0.16);
+  border: 1px solid var(--faculty-chart-border);
   border-radius: 12px;
-  background:
-    linear-gradient(90deg, rgba(255, 147, 47, 0.08), transparent 40%),
-    linear-gradient(180deg, rgba(255, 147, 47, 0.1), rgba(255, 147, 47, 0.035)),
-    #1B1511;
+  background: var(--faculty-chart-bg);
   padding: 0.3rem 0.45rem 0.15rem;
 }
 
@@ -331,9 +361,9 @@
   padding: 0.55rem 0.65rem;
   border: 1px solid var(--faculty-border);
   border-radius: 10px;
-  background: rgba(18, 18, 18, 0.96);
+  background: var(--faculty-tooltip-bg);
   color: var(--faculty-text);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--faculty-card-shadow-strong);
 }
 
 .faculty-chart-tooltip span {
@@ -374,7 +404,7 @@
   height: 13px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.11);
+  background: var(--faculty-meter-bg);
 }
 
 .faculty-phase-bar span {
@@ -431,13 +461,13 @@
   min-height: 116px;
   border: 1px solid var(--faculty-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--faculty-subtle);
   padding: 0.65rem;
 }
 
 .faculty-day-card.has-class {
-  border-color: rgba(255, 147, 47, 0.5);
-  background: linear-gradient(180deg, rgba(255, 147, 47, 0.14), rgba(255, 147, 47, 0.04));
+  border-color: var(--faculty-border-strong);
+  background: var(--faculty-accent-soft);
 }
 
 .faculty-day-card > strong {
@@ -456,7 +486,7 @@
   width: 100%;
   border: 0;
   border-radius: 9px;
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--faculty-panel);
   color: var(--faculty-text);
   padding: 0.5rem;
   text-align: left;
@@ -489,38 +519,43 @@
 
 .faculty-low-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
 }
 
-.faculty-low-card {
+.faculty-low-row {
   display: grid;
-  gap: 0.65rem;
-  min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid var(--faculty-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 0.75rem;
+  background: var(--faculty-panel);
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+  transition: border-color 180ms ease-out, background 180ms ease-out;
+  cursor: pointer;
+  min-width: 0;
 }
 
-.faculty-low-card.status-subject_below_target {
-  border-color: rgba(255, 77, 87, 0.38);
-  background: linear-gradient(180deg, rgba(255, 77, 87, 0.12), rgba(255, 255, 255, 0.025));
+.faculty-low-row:hover {
+  border-color: var(--faculty-border-strong);
+  background: var(--faculty-accent-soft);
 }
 
-.faculty-low-card.status-final_below_target {
-  border-color: rgba(245, 164, 0, 0.34);
-  background: linear-gradient(180deg, rgba(245, 164, 0, 0.1), rgba(255, 255, 255, 0.025));
+.faculty-low-row.status-subject_below_target {
+  border-left: 3px solid var(--faculty-danger-text);
 }
 
-.faculty-low-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
+.faculty-low-row.status-final_below_target {
+  border-left: 3px solid var(--faculty-warning-text);
 }
 
-.faculty-low-top strong {
+.faculty-low-info {
+  min-width: 0;
+}
+
+.faculty-low-info strong {
   display: block;
   overflow: hidden;
   color: var(--faculty-text);
@@ -530,98 +565,76 @@
   white-space: nowrap;
 }
 
-.faculty-low-top span {
+.faculty-low-info span {
   display: block;
-  margin-top: 0.18rem;
+  margin-top: 0.15rem;
   color: var(--faculty-secondary);
   font-size: 0.68rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.faculty-low-top b {
-  display: inline-flex;
+.faculty-low-metrics {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0 0.5rem;
+  border-left: 1px solid var(--faculty-border);
+  border-right: 1px solid var(--faculty-border);
+}
+
+.faculty-low-metrics > div {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  min-height: 24px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: rgba(255, 147, 47, 0.18);
-  color: #FFD19B;
-  font-size: 0.62rem;
-  line-height: 1;
-  padding: 0 0.55rem;
-}
-
-.faculty-low-card.status-subject_below_target .faculty-low-top b {
-  background: rgba(255, 77, 87, 0.18);
-  color: #FFB6BA;
-}
-
-.faculty-low-scores {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-
-.faculty-low-scores span {
-  display: grid;
   gap: 0.1rem;
-  min-height: 52px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.16);
-  padding: 0.45rem 0.5rem;
+  min-width: 42px;
 }
 
-.faculty-low-scores small {
+.faculty-low-metrics small {
   color: var(--faculty-muted);
-  font-size: 0.62rem;
+  font-size: 0.55rem;
   font-weight: 800;
   text-transform: uppercase;
 }
 
-.faculty-low-scores strong {
+.faculty-low-metrics b {
   color: var(--faculty-text);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
-.faculty-low-reasons {
+.faculty-low-action {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-.faculty-low-reasons span {
-  border-radius: 999px;
-  background: rgba(245, 164, 0, 0.13);
-  color: #FFD188;
-  font-size: 0.65rem;
-  font-weight: 800;
-  padding: 0.22rem 0.5rem;
-}
-
-.faculty-low-card p {
-  color: var(--faculty-secondary);
-  font-size: 0.68rem;
-  line-height: 1.35;
-}
-
-.faculty-low-card button {
+.faculty-low-badge {
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  min-height: 32px;
-  border: 1px solid rgba(255, 147, 47, 0.24);
-  border-radius: 9px;
-  background: rgba(255, 147, 47, 0.08);
-  color: var(--faculty-accent);
-  font-size: 0.72rem;
+  min-height: 22px;
+  border-radius: 999px;
+  background: var(--faculty-accent-soft);
+  color: var(--faculty-accent-text);
+  font-size: 0.62rem;
   font-weight: 800;
-  padding: 0 0.65rem;
-  transition: border-color 180ms ease-out, background 180ms ease-out;
+  padding: 0 0.55rem;
 }
 
-.faculty-low-card button:hover {
-  border-color: var(--faculty-border-strong);
-  background: rgba(255, 147, 47, 0.14);
+.status-subject_below_target .faculty-low-badge {
+  background: var(--faculty-danger-soft);
+  color: var(--faculty-danger-text);
+}
+
+.faculty-low-action svg {
+  color: var(--faculty-muted);
+  transition: transform 180ms ease-out, color 180ms ease-out;
+}
+
+.faculty-low-row:hover .faculty-low-action svg {
+  color: var(--faculty-accent-text);
+  transform: translateX(2px);
 }
 
 .faculty-record-strip {
@@ -639,12 +652,12 @@
 
 .faculty-record-chip:hover {
   border-color: var(--faculty-border-strong);
-  background: linear-gradient(180deg, rgba(255, 147, 47, 0.1), rgba(255, 255, 255, 0.018)), var(--faculty-panel);
+  background: var(--faculty-accent-soft);
 }
 
 .faculty-record-chip span {
   display: inline-flex;
-  color: var(--faculty-accent);
+  color: var(--faculty-accent-text);
   font-size: 0.72rem;
   font-weight: 800;
 }
@@ -685,14 +698,14 @@
   min-height: 48px;
   border: 1px solid var(--faculty-border);
   border-radius: 13px;
-  background: #121212;
+  background: var(--faculty-subtle);
   color: var(--faculty-text);
 }
 
 .faculty-date-strip span.is-today {
   border-color: var(--faculty-accent);
-  background: linear-gradient(180deg, #FFA24A, #FF8735);
-  color: #19120C;
+  background: var(--faculty-action-bg);
+  color: var(--faculty-on-accent);
 }
 
 .faculty-date-strip strong {
@@ -720,7 +733,7 @@
   min-width: 0;
   border: 1px solid var(--faculty-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--faculty-subtle);
   color: var(--faculty-text);
   text-align: left;
   transition: border-color 180ms ease-out, background 180ms ease-out;
@@ -729,7 +742,7 @@
 .faculty-upcoming-list button:hover,
 .faculty-risk-list button:hover {
   border-color: var(--faculty-border-strong);
-  background: rgba(255, 147, 47, 0.08);
+  background: var(--faculty-accent-soft);
 }
 
 .faculty-upcoming-list button {
@@ -785,8 +798,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: rgba(255, 147, 47, 0.2);
-  color: #FFC98E;
+  background: var(--faculty-accent-soft);
+  color: var(--faculty-accent-text);
   font-size: 0.63rem;
   font-weight: 800;
   padding: 0 0.45rem;
@@ -795,7 +808,7 @@
 .faculty-watch-list article {
   border: 1px solid var(--faculty-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--faculty-subtle);
   padding: 0.75rem;
 }
 
@@ -834,8 +847,8 @@
 
 .faculty-watch-dates span {
   border-radius: 999px;
-  background: rgba(255, 77, 87, 0.13);
-  color: #FFB0B4;
+  background: var(--faculty-danger-soft);
+  color: var(--faculty-danger-text);
   font-size: 0.65rem;
   font-weight: 800;
   padding: 0.2rem 0.45rem;
@@ -871,10 +884,10 @@
   min-height: 0;
   border: 1px solid var(--faculty-border);
   border-radius: 999px;
-  background: rgba(18, 18, 18, 0.9);
+  background: var(--faculty-tooltip-bg);
   color: var(--faculty-secondary);
   padding: 0.55rem 0.8rem;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--faculty-card-shadow-strong);
 }
 
 @media (max-width: 1280px) {
@@ -907,6 +920,10 @@
     padding: 1rem;
   }
 
+  .faculty-title-block h1 {
+    font-size: 1.5rem;
+  }
+
   .faculty-hero-row,
   .faculty-hero-actions {
     align-items: stretch;
@@ -917,7 +934,42 @@
     width: 100%;
   }
 
-  .faculty-kpi-grid,
+  .faculty-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+  }
+
+  .faculty-kpi-card {
+    aspect-ratio: auto;
+    min-height: 110px;
+    padding: 0.85rem;
+    border-radius: 18px; /* Apple widget rounding */
+    justify-content: flex-start;
+    gap: 0.35rem;
+  }
+
+  .faculty-kpi-head {
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .faculty-kpi-head span {
+    font-size: 0.72rem;
+    line-height: 1;
+    text-transform: none; /* Modern widget text */
+  }
+
+  .faculty-kpi-card strong {
+    font-size: 1.55rem;
+    line-height: 1;
+    margin-top: auto;
+  }
+
+  .faculty-kpi-card p {
+    display: none; /* Remove long descriptions */
+  }
+
   .faculty-record-strip {
     grid-template-columns: 1fr;
   }
@@ -942,7 +994,34 @@
     padding: 0.75rem;
   }
 
-  .faculty-low-scores {
+  .faculty-kpi-grid {
+    gap: 0.55rem;
+  }
+
+  .faculty-kpi-card {
+    padding: 0.75rem;
+    min-height: 100px;
+    border-radius: 16px;
+  }
+
+  .faculty-kpi-head span {
+    font-size: 0.68rem;
+  }
+
+  .faculty-kpi-card strong {
+    font-size: 1.45rem;
+  }
+
+  .faculty-low-row {
     grid-template-columns: 1fr;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .faculty-low-metrics {
+    border-left: none;
+    border-right: none;
+    padding: 0;
+    justify-content: flex-start;
   }
 }

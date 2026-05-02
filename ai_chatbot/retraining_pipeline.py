@@ -117,6 +117,22 @@ def predict_intent_with_model(text, model=None):
     if not model:
         return None, 0.0
 
+    # Handle Scikit-Learn Model
+    if hasattr(model, "predict_proba"):
+        probs = model.predict_proba([text])[0]
+        classes = model.classes_
+        ranked = sorted(zip(classes, probs), key=lambda x: x[1], reverse=True)
+        best_intent, best_prob = ranked[0]
+        
+        if len(ranked) > 1:
+            margin = best_prob - ranked[1][1]
+            confidence = max(0.5, min(0.95, best_prob + (margin / 2)))
+        else:
+            confidence = best_prob
+            
+        return best_intent, round(confidence, 3)
+
+    # Handle Legacy Custom Naive Bayes
     tokens = _tokens(text)
     if not tokens:
         return None, 0.0
@@ -147,6 +163,24 @@ def predict_intent_with_model(text, model=None):
 
 
 def _build_naive_bayes_model(examples):
+    try:
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.linear_model import SGDClassifier
+        from sklearn.pipeline import Pipeline
+        
+        X = [ex["text"] for ex in examples]
+        y = [ex["corrected_intent"] for ex in examples]
+        
+        pipeline = Pipeline([
+            ('tfidf', TfidfVectorizer(token_pattern=r"(?u)\b\w+\b", ngram_range=(1, 2))),
+            ('clf', SGDClassifier(loss='log_loss', penalty='l2', alpha=1e-4, random_state=42, max_iter=50, tol=None))
+        ])
+        pipeline.fit(X, y)
+        return pipeline
+    except ImportError:
+        # Fallback to custom NB if scikit-learn is not available
+        pass
+
     token_counts = defaultdict(Counter)
     intent_doc_counts = Counter()
     vocabulary = set()

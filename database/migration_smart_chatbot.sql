@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS chatbot_user_memory (
     preferred_response_style VARCHAR(40) DEFAULT 'concise',
     frequent_intents TEXT DEFAULT NULL,
     last_topics TEXT DEFAULT NULL,
+    profile_memory TEXT DEFAULT NULL,
     memory_summary TEXT DEFAULT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

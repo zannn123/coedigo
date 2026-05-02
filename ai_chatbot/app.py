@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 from chatbot import AcademicChatbot
@@ -19,6 +19,13 @@ chatbot = AcademicChatbot()
 @app.get("/health")
 def health():
     return jsonify({"status": "ok", "service": "C.O.E.D.I.G.O. Academic Assistant"})
+
+
+@app.route('/static/generated_charts/<path:filename>')
+def serve_chart(filename):
+    """Serve generated chart images"""
+    charts_dir = os.path.join(os.path.dirname(__file__), 'static', 'generated_charts')
+    return send_from_directory(charts_dir, filename)
 
 
 @app.post("/chat")

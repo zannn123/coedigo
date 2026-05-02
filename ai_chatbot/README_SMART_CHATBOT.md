@@ -44,9 +44,43 @@ It stores behavior patterns only:
 - frequent intents
 - recent topics
 - preferred response style
+- safe profile preferences such as a preferred name
 - short memory summary
 
 It does not store private grades, attendance records, schedules, or student academic details. Those records are always retrieved from the database at request time.
+
+Examples:
+
+- User: `hi i am zann`
+- Assistant: remembers `Zann` as the preferred name.
+- User later: `who is me`
+- Assistant: answers from saved same-user memory.
+
+## Faculty Student Grade Lookup
+
+Faculty and authorized academic roles can ask for a student grade by name. The assistant searches only inside the user's authorized database scope.
+
+Example:
+
+```json
+{
+  "user_id": 5,
+  "role": "faculty",
+  "message": "What is the grade of Gloryzann Aclao?"
+}
+```
+
+If the student has multiple handled class records, the assistant asks which subject to use. A follow-up such as `CPE 316` continues the same lookup through session context.
+
+Students cannot use this path to view another student's record.
+
+## Optional Web Lookup
+
+Explicit general web questions such as `search the web for machine learning` use an optional no-key web lookup path. Academic questions remain database-first and role-scoped. Set this environment variable to disable web lookup:
+
+```text
+CHATBOT_WEB_LOOKUP_ENABLED=0
+```
 
 ## Feedback
 

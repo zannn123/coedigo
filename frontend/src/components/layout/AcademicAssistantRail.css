@@ -273,12 +273,13 @@
   width: 100%;
 }
 
-.assistant-message span {
+.assistant-message span,
+.assistant-msg-text {
   max-width: 90%;
   padding: 0.64rem 0.72rem;
   border-radius: 15px;
   font-size: 0.78rem;
-  line-height: 1.44;
+  line-height: 1.52;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -298,7 +299,8 @@
   align-items: flex-start;
 }
 
-.assistant-message.from-assistant span {
+.assistant-message.from-assistant span,
+.assistant-message.from-assistant .assistant-msg-text {
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-primary);
@@ -712,4 +714,77 @@
   .assistant-composer {
     margin: 0 0.72rem 0.72rem;
   }
+}
+/* ── Message body + source button ──────────────────────────────────── */
+
+.assistant-msg-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: 90%;
+}
+
+.assistant-msg-body .assistant-msg-text {
+  max-width: 100%;
+  width: 100%;
+}
+
+/* Bullet list lines */
+.assistant-bullet {
+  display: flex;
+  align-items: baseline;
+  gap: 0.36rem;
+  padding-left: 0.1rem;
+}
+
+.assistant-bullet-dot {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  margin-top: 0.05rem;
+}
+
+/* Source link button — premium pill */
+.assistant-source-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-elevated));
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  transition: background 160ms ease, border-color 160ms ease, transform 120ms ease, box-shadow 160ms ease;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.assistant-source-btn:hover,
+.assistant-source-btn:focus-visible {
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-elevated));
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 22%, transparent);
+  transform: translateY(-1px);
+  outline: none;
+  text-decoration: none;
+}
+
+.assistant-source-btn svg {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+[data-theme='dark'] .assistant-source-btn {
+  background: color-mix(in srgb, var(--accent) 12%, rgba(0,0,0,0.25));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+[data-theme='dark'] .assistant-source-btn:hover {
+  background: color-mix(in srgb, var(--accent) 22%, rgba(0,0,0,0.3));
 }

@@ -265,6 +265,87 @@ def get_student_grades(user_id, subject_hint=None):
     return rows
 
 
+def get_authorized_student_grade_records(user_id, role, student_name=None, subject_hint=None, limit=40):
+    role = normalize_role(role)
+    if role is None or role == "student":
+        return []
+
+    name_tokens = _search_tokens(student_name)
+    if not name_tokens:
+        return []
+
+    where_sql, params = _scope_condition(user_id, role, student_alias="stu", class_alias="cr", subject_alias="s")
+    clauses = [where_sql]
+
+    for token in name_tokens:
+        clauses.append(
+            """
+            (
+                LOWER(CONCAT_WS(' ', stu.first_name, stu.middle_name, stu.last_name)) LIKE %s
+                OR LOWER(stu.student_id) LIKE %s
+                OR LOWER(stu.email) LIKE %s
+            )
+            """
+        )
+        pattern = f"%{token}%"
+        params.extend([pattern, pattern, pattern])
+
+    subject_tokens = _search_tokens(subject_hint)
+    for token in subject_tokens:
+        clauses.append("(LOWER(s.code) LIKE %s OR LOWER(s.name) LIKE %s)")
+        pattern = f"%{token}%"
+        params.extend([pattern, pattern])
+
+    limit = max(1, min(int(limit), 100))
+    rows = _query_all(
+        f"""
+        SELECT
+            e.id AS enrollment_id,
+            stu.id AS student_user_id,
+            stu.student_id AS student_number,
+            CONCAT_WS(' ', stu.first_name, stu.middle_name, stu.last_name) AS student_name,
+            stu.department,
+            stu.program,
+            stu.year_level,
+            cr.id AS class_id,
+            cr.section,
+            cr.academic_year,
+            cr.semester,
+            cr.schedule,
+            cr.room,
+            cr.grade_status,
+            s.code AS subject_code,
+            s.name AS subject_name,
+            s.program AS subject_program,
+            g.major_exam_avg,
+            g.quiz_avg,
+            g.project_avg,
+            g.weighted_score,
+            NULL AS midterm_grade,
+            g.final_grade,
+            NULL AS overall_grade,
+            g.remarks,
+            g.computed_at
+        FROM enrollments e
+        INNER JOIN users stu ON stu.id = e.student_id
+        INNER JOIN class_records cr ON cr.id = e.class_record_id
+        INNER JOIN subjects s ON s.id = cr.subject_id
+        LEFT JOIN grades g ON g.enrollment_id = e.id
+        WHERE e.is_active = 1
+          AND cr.is_active = 1
+          AND {' AND '.join(clauses)}
+        ORDER BY stu.last_name, stu.first_name, cr.academic_year DESC, cr.semester DESC, s.code, cr.section
+        LIMIT {limit}
+        """,
+        tuple(params),
+    )
+
+    rows = _apply_term_performance(rows)
+    for row in rows:
+        row["can_view_grade"] = True
+    return rows
+
+
 def get_student_risk_status(user_id):
     rows = _get_risk_rows(user_id, "student")
     return [_decorate_risk_row(row, expose_unverified_grade=False) for row in rows]
@@ -938,6 +1019,7 @@ def ensure_smart_chatbot_tables():
             preferred_response_style VARCHAR(40) DEFAULT 'concise',
             frequent_intents TEXT DEFAULT NULL,
             last_topics TEXT DEFAULT NULL,
+            profile_memory TEXT DEFAULT NULL,
             memory_summary TEXT DEFAULT NULL,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -945,6 +1027,9 @@ def ensure_smart_chatbot_tables():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """,
     )
+
+    if not _column_exists("chatbot_user_memory", "profile_memory"):
+        _execute("ALTER TABLE chatbot_user_memory ADD COLUMN profile_memory TEXT DEFAULT NULL AFTER last_topics")
 
     _execute(
         """
@@ -963,7 +1048,7 @@ def ensure_smart_chatbot_tables():
 
 
 def _column_exists(table, column):
-    if table not in {"chatbot_messages", "chatbot_sessions"}:
+    if table not in {"chatbot_messages", "chatbot_sessions", "chatbot_user_memory"}:
         return False
     return _query_one(
         """
@@ -1087,6 +1172,16 @@ def _infer_start_meridiem(start_text, end_text, end_meridiem):
     if end_hour == 12 or start_hour > end_hour:
         return "AM"
     return "PM"
+
+
+def _search_tokens(value):
+    text = re.sub(r"[^a-z0-9\s@._-]", " ", str(value or "").lower())
+    tokens = [
+        token
+        for token in text.split()
+        if len(token) >= 2 and token not in {"the", "student", "grade", "grades", "score", "mark", "subject", "class"}
+    ]
+    return tokens[:5]
 
 
 def _today():

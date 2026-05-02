@@ -58,6 +58,8 @@ TOKEN_SYNONYMS = {
     "doing": "performance",
     "failing": "risk",
     "failed": "risk",
+    "grade": "score",
+    "grades": "score",
     "help": "attention",
     "incomplete": "missing",
     "intervention": "attention",
@@ -87,6 +89,9 @@ PHRASE_NORMALIZATIONS = [
     ("incomplete requirements", "missing activities"),
     ("incomplete submissions", "missing activities"),
     ("not submitted", "missing activities"),
+    ("marks of", "grade of"),
+    ("scores of", "grade of"),
+    ("student standing", "student grade"),
 ]
 
 
@@ -453,6 +458,39 @@ INTENT_EXAMPLES = {
         "program students needing intervention",
         "program monitoring actions",
     ]),
+    "student_grade_lookup": _expand([
+        "what is the grade of a student",
+        "grade of gloryzann aclao",
+        "show student grade",
+        "check student score",
+        "student standing in subject",
+        "what is zann grade",
+        "display grade for student",
+        "student grade in cpe 316",
+        "how is this student doing in class",
+    ]),
+    "small_talk_greeting": _expand([
+        "hi",
+        "hello",
+        "hey",
+        "hi i am zann",
+        "my name is zann",
+        "call me zann",
+    ], prefixes=[""], suffixes=[""]),
+    "identity_recall": _expand([
+        "who am i",
+        "who is me",
+        "what is my name",
+        "do you remember my name",
+    ], prefixes=[""], suffixes=[""]),
+    "web_search": _expand([
+        "search the web",
+        "search online",
+        "look up online",
+        "what is machine learning",
+        "define civil engineering",
+        "who is alan turing",
+    ], prefixes=[""], suffixes=[""]),
     "explain_previous_result": _expand([
         "why",
         "explain",

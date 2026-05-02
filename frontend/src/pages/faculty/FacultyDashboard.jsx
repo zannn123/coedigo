@@ -490,7 +490,7 @@ export default function FacultyDashboard() {
                 {chartData.length ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PerformanceLineChart data={chartData} margin={{ top: 8, right: 8, left: -22, bottom: 2 }}>
-                      <CartesianGrid stroke="rgba(255,255,255,0.11)" strokeDasharray="3 9" vertical={false} />
+                      <CartesianGrid stroke="var(--faculty-chart-grid)" strokeDasharray="3 9" vertical={false} />
                       <XAxis
                         dataKey="subject_code"
                         axisLine={false}
@@ -505,8 +505,8 @@ export default function FacultyDashboard() {
                         tickLine={false}
                         tick={{ fill: 'var(--faculty-muted)', fontSize: 10 }}
                       />
-                      <Tooltip content={<FacultyTooltip />} cursor={{ stroke: 'rgba(255,147,47,0.28)' }} />
-                      <ReferenceLine y={summary.low_score_line} stroke="rgba(255,147,47,0.34)" strokeDasharray="4 6" />
+                      <Tooltip content={<FacultyTooltip />} cursor={{ stroke: 'var(--faculty-chart-cursor)' }} />
+                      <ReferenceLine y={summary.low_score_line} stroke="var(--faculty-chart-reference)" strokeDasharray="4 6" />
                       <Line
                         type="monotone"
                         dataKey="average_score"
@@ -579,38 +579,28 @@ export default function FacultyDashboard() {
             {lowPerformanceWatchlist.length ? (
               <div className="faculty-low-list">
                 {lowPerformanceWatchlist.map(item => (
-                  <article key={`${item.enrollment_id}-${item.class_id}`} className={`faculty-low-card status-${item.performance_status}`}>
-                    <div className="faculty-low-top">
-                      <div>
-                        <strong>{item.full_name || 'Student'}</strong>
-                        <span>{formatClassMeta(item)}</span>
-                      </div>
-                      <b>{performanceStatusLabel(item.performance_status)}</b>
+                  <button 
+                    type="button" 
+                    key={`${item.enrollment_id}-${item.class_id}`} 
+                    className={`faculty-low-row status-${item.performance_status}`}
+                    onClick={() => navigate(`/faculty/classes/${item.class_id}`)}
+                  >
+                    <div className="faculty-low-info">
+                      <strong>{item.full_name || 'Student'}</strong>
+                      <span>{formatClassMeta(item)}</span>
                     </div>
 
-                    <div className="faculty-low-scores" aria-label="Term performance scores">
-                      <span><small>Midterm</small><strong>{formatScore(item.midterm_score)}</strong></span>
-                      <span><small>Final</small><strong>{formatScore(item.final_score)}</strong></span>
-                      <span><small>Subject</small><strong>{item.has_midterm_scores && item.has_final_scores ? formatScore(item.subject_score) : 'Pending'}</strong></span>
+                    <div className="faculty-low-metrics" aria-label="Term performance scores">
+                      <div><small>MID</small><b>{formatScore(item.midterm_score)}</b></div>
+                      <div><small>FIN</small><b>{formatScore(item.final_score)}</b></div>
+                      <div><small>SUB</small><b>{item.has_midterm_scores && item.has_final_scores ? formatScore(item.subject_score) : '-'}</b></div>
                     </div>
 
-                    <div className="faculty-low-reasons">
-                      {(item.reasons || []).map(reason => (
-                        <span key={`${item.enrollment_id}-${reason.type}`}>
-                          {reason.label}: {formatScore(reason.score)}
-                        </span>
-                      ))}
+                    <div className="faculty-low-action">
+                      <span className="faculty-low-badge">{performanceStatusLabel(item.performance_status)}</span>
+                      <ChevronRight size={16} />
                     </div>
-
-                    {!item.has_final_scores && (
-                      <p>Final record is pending, so the subject outcome is not classified yet.</p>
-                    )}
-
-                    <button type="button" onClick={() => navigate(`/faculty/classes/${item.class_id}`)}>
-                      Open record
-                      <ChevronRight size={14} />
-                    </button>
-                  </article>
+                  </button>
                 ))}
               </div>
             ) : (

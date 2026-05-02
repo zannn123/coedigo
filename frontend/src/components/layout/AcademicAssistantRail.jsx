@@ -12,6 +12,14 @@ import {
   ThumbsUp,
   Trash2,
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import { useAuth } from '../../contexts/AuthContext';
 import './AcademicAssistantRail.css';
 
@@ -232,6 +240,7 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
           role: 'assistant',
           text: reply,
           suggestions: Array.isArray(data.suggested_questions) ? data.suggested_questions : [],
+          graph: data.graph,
         },
       ]);
       if (data.session_id) setSessionId(data.session_id);
@@ -416,7 +425,20 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
 
             {messages.map(message => (
               <div key={message.id} className={`assistant-message ${message.role === 'user' ? 'from-user' : 'from-assistant'}`}>
-                <span>{message.text}</span>
+                {renderMessageContent(message)}
+                {message.graph && message.graph.type === 'bar' && (
+                  <div className="assistant-graph-container" style={{ marginTop: '12px', height: '180px', width: '100%' }}>
+                    <h4 style={{ fontSize: '12px', margin: '0 0 8px 0', fontWeight: '600' }}>{message.graph.title}</h4>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={message.graph.data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                        <XAxis dataKey="name" tick={{fontSize: 10}} interval={0} angle={-30} textAnchor="end" height={40} />
+                        <YAxis tick={{fontSize: 10}} />
+                        <Tooltip contentStyle={{ fontSize: '12px', borderRadius: '8px' }} />
+                        <Bar dataKey={message.graph.dataKey} fill="var(--color-primary, #3b82f6)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
                 {message.role === 'assistant' && message.messageId && (
                   <div className="assistant-feedback-row" aria-label="Answer feedback">
                     <button
@@ -520,6 +542,72 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
   );
 }
 
+/**
+ * Parses bot message text into:
+ * - A clean body (source line stripped out)
+ * - An optional source URL
+ * Then renders body with bold, bullets, and line breaks.
+ */
+function renderMessageContent(message) {
+  if (message.role === 'user') {
+    return <span className="assistant-msg-text">{message.text}</span>;
+  }
+
+  const raw = message.text || '';
+
+  // Extract *Source: URL* or Source: URL from the text
+  const sourceMatch = raw.match(/[\n\r]*\*?Source:\s*(https?:\/\/[^\s*]+)\*?/i);
+  const sourceUrl   = sourceMatch ? sourceMatch[1].trim() : null;
+  const body        = sourceMatch ? raw.replace(sourceMatch[0], '').trimEnd() : raw;
+
+  // Split into segments for inline bold (**text**) + line break aware rendering
+  const renderBody = (text) => {
+    const lines = text.split(/\r?\n/);
+    return lines.map((line, li) => {
+      const isBullet = /^[•\-\*]\s+/.test(line);
+      const stripped = isBullet ? line.replace(/^[•\-\*]\s+/, '') : line;
+
+      // Inline bold: **word**
+      const parts = stripped.split(/(\*\*[^*]+\*\*)/g).map((part, pi) => {
+        if (/^\*\*(.+)\*\*$/.test(part)) {
+          return <strong key={pi}>{part.slice(2, -2)}</strong>;
+        }
+        return part;
+      });
+
+      return (
+        <span key={li} className={isBullet ? 'assistant-bullet' : ''}>
+          {isBullet && <span className="assistant-bullet-dot">•</span>}
+          {parts}
+          {li < lines.length - 1 && !isBullet && <br />}
+        </span>
+      );
+    });
+  };
+
+  return (
+    <div className="assistant-msg-body">
+      <div className="assistant-msg-text">{renderBody(body)}</div>
+      {sourceUrl && (
+        <a
+          href={sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="assistant-source-btn"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+          View source
+        </a>
+      )}
+    </div>
+  );
+}
+
+
 function toMessage(item) {
   return {
     id: item.id || crypto.randomUUID(),
@@ -527,6 +615,7 @@ function toMessage(item) {
     sessionId: item.session_id,
     role: item.role,
     text: item.text,
+    graph: item.graph,
   };
 }
 

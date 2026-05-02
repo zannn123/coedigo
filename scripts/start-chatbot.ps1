@@ -62,7 +62,7 @@ $dependencyOut = Join-Path $logDir 'dependency-check.out.log'
 $dependencyErr = Join-Path $logDir 'dependency-check.err.log'
 $dependencyCheck = Start-Process `
     -FilePath $venvPython `
-    -ArgumentList @('-c', 'import flask, flask_cors, mysql.connector, dotenv, requests') `
+    -ArgumentList @('-c', 'import flask, flask_cors, mysql.connector, dotenv, requests, sklearn') `
     -Wait `
     -PassThru `
     -RedirectStandardOutput $dependencyOut `

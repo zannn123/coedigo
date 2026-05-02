@@ -1,4 +1,5 @@
 import json
+import re
 from collections import Counter
 
 from database_tools import _execute, _query_one, ensure_smart_chatbot_tables, normalize_role
@@ -39,7 +40,7 @@ ROLE_SUGGESTIONS = {
 }
 
 
-def update_user_memory(user_id, role, detected_intent):
+def update_user_memory(user_id, role, detected_intent, user_message=None):
     role = normalize_role(role)
     if role is None or not detected_intent or detected_intent == "unknown":
         return
@@ -52,7 +53,9 @@ def update_user_memory(user_id, role, detected_intent):
     last_topics = [detected_intent] + [topic for topic in existing.get("last_topics_list", []) if topic != detected_intent]
     last_topics = last_topics[:6]
     preferred_style = existing.get("preferred_response_style") or ROLE_DEFAULT_STYLE.get(role, "concise")
-    memory_summary = _build_memory_summary(role, frequent)
+    profile_memory = dict(existing.get("profile_memory_map", {}))
+    profile_memory.update(extract_profile_memory(user_message))
+    memory_summary = _build_memory_summary(role, frequent, profile_memory)
 
     _execute(
         """
@@ -62,13 +65,15 @@ def update_user_memory(user_id, role, detected_intent):
             preferred_response_style,
             frequent_intents,
             last_topics,
+            profile_memory,
             memory_summary
         )
-        VALUES (%s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             preferred_response_style = VALUES(preferred_response_style),
             frequent_intents = VALUES(frequent_intents),
             last_topics = VALUES(last_topics),
+            profile_memory = VALUES(profile_memory),
             memory_summary = VALUES(memory_summary),
             updated_at = NOW()
         """,
@@ -78,6 +83,7 @@ def update_user_memory(user_id, role, detected_intent):
             preferred_style,
             json.dumps(frequent),
             json.dumps(last_topics),
+            json.dumps(profile_memory),
             memory_summary,
         ),
     )
@@ -100,6 +106,7 @@ def get_user_memory(user_id, role=None):
             preferred_response_style,
             frequent_intents,
             last_topics,
+            profile_memory,
             memory_summary,
             updated_at
         FROM chatbot_user_memory
@@ -116,11 +123,13 @@ def get_user_memory(user_id, role=None):
             "preferred_response_style": ROLE_DEFAULT_STYLE.get(normalized_role or "", "concise"),
             "frequent_intents_map": {},
             "last_topics_list": [],
+            "profile_memory_map": {},
             "memory_summary": "",
         }
 
     row["frequent_intents_map"] = _safe_json(row.get("frequent_intents"), {})
     row["last_topics_list"] = _safe_json(row.get("last_topics"), [])
+    row["profile_memory_map"] = _safe_json(row.get("profile_memory"), {})
     return row
 
 
@@ -150,11 +159,86 @@ def get_suggested_followups(user_id, role, last_intent):
     return suggestions[:3]
 
 
-def _build_memory_summary(role, frequent):
-    if not frequent:
-        return ""
-    top_intent = next(iter(frequent))
-    return f"{role} commonly asks about {top_intent.replace('_', ' ')}."
+def extract_profile_memory(message):
+    text = (message or "").strip()
+    if not text:
+        return {}
+
+    patterns = [
+        r"(?:^|\b)(?:hi|hello|hey)?\s*(?:i am|i'm|im|my name is|call me|you can call me)\s+([a-z][a-z\s.'-]{1,48})(?:[.!?,]|$)",
+        r"(?:^|\b)(?:remember that|remember,?)\s+(?:i am|i'm|im|my name is)\s+([a-z][a-z\s.'-]{1,48})(?:[.!?,]|$)",
+    ]
+
+    lowered = text.lower()
+    for pattern in patterns:
+        match = re.search(pattern, lowered, flags=re.IGNORECASE)
+        if not match:
+            continue
+        name = _clean_preferred_name(match.group(1))
+        if name:
+            return {"preferred_name": name}
+    return {}
+
+
+def get_preferred_name(user_id, role):
+    memory = get_user_memory(user_id, role)
+    return (memory.get("profile_memory_map") or {}).get("preferred_name")
+
+
+def is_identity_question(message):
+    text = re.sub(r"[^a-z0-9\s]", " ", (message or "").lower())
+    text = " ".join(text.split())
+    return text in {
+        "who am i",
+        "who is me",
+        "what is my name",
+        "do you remember me",
+        "do you remember my name",
+        "what did i say my name is",
+    }
+
+
+def _build_memory_summary(role, frequent, profile_memory=None):
+    fragments = []
+    preferred_name = (profile_memory or {}).get("preferred_name")
+    if preferred_name:
+        fragments.append(f"User prefers to be called {preferred_name}.")
+    if frequent:
+        top_intent = next(iter(frequent))
+        fragments.append(f"{role} commonly asks about {top_intent.replace('_', ' ')}.")
+    return " ".join(fragments)
+
+
+def _clean_preferred_name(value):
+    value = re.sub(
+        r"\b(and|but|because|please|thanks|thank you|what|show|check|get|display|view|can|do)\b.*$",
+        "",
+        value or "",
+        flags=re.IGNORECASE,
+    )
+    value = re.sub(r"[^a-zA-Z\s.'-]", " ", value)
+    value = " ".join(value.split()).strip(" .'-")
+    if not value:
+        return None
+
+    blocked = {
+        "a student",
+        "an student",
+        "faculty",
+        "a faculty",
+        "at risk",
+        "in class",
+        "not sure",
+        "fine",
+        "okay",
+        "ok",
+    }
+    if value.lower() in blocked or value.lower().startswith(("at ", "in ", "a ", "an ", "not ")):
+        return None
+    if len(value) > 40:
+        return None
+
+    return " ".join(part.capitalize() for part in value.split())
 
 
 def _safe_json(value, fallback):

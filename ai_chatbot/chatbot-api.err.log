@@ -1,0 +1,46 @@
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:5000
+Press CTRL+C to quit
+127.0.0.1 - - [02/May/2026 12:25:45] "GET /health HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:32:32] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:32:42] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:32:55] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:33:00] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:33:12] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:33:17] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:33:42] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:33:51] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:34:05] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:37:43] "GET /chat/sessions?user_id=2&role=faculty&limit=25 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:37:44] "GET /chat/sessions?user_id=2&role=faculty&limit=25 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:49:50] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:50:33] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 12:50:45] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:17:11] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:17:31] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:17:36] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:23:17] "GET /chat/sessions?user_id=2&role=faculty&limit=25 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:23:18] "GET /chat/sessions?user_id=2&role=faculty&limit=25 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:23:19] "DELETE /chat/sessions/8edbba42b14a4d46baeff428afc5c53b?user_id=2&role=faculty HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:23:20] "DELETE /chat/sessions/e36a66d3a9784c3ab32a3fefb16bc119?user_id=2&role=faculty HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:23:21] "DELETE /chat/sessions/4a936a4430dd48c8b8e798882e7c7a8f?user_id=2&role=faculty HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:23:22] "DELETE /chat/sessions/58c95b84d563404d88d67ef40f9af529?user_id=2&role=faculty HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:23:23] "DELETE /chat/sessions/39e66a3af88b48988b1e29b4949ce0ca?user_id=2&role=faculty HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:23:24] "DELETE /chat/sessions/004614a7117c4ea2a702aaa0da79a1ea?user_id=2&role=faculty HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:23:25] "DELETE /chat/sessions/20546a6f175944888373af13bd066694?user_id=2&role=faculty HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:23:30] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:36:01] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:36:13] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:40:06] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:40:15] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:40:20] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:40:28] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:42:58] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:44:20] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:49:23] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:49:28] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 13:49:39] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 14:04:05] "GET /chat/sessions?user_id=2&role=faculty&limit=25 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 14:04:05] "GET /chat/sessions?user_id=2&role=faculty&limit=25 HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 14:04:09] "DELETE /chat/sessions/7e8c281cc1084dc2b4c0deef801212e0?user_id=2&role=faculty HTTP/1.1" 200 -
+127.0.0.1 - - [02/May/2026 14:04:11] "DELETE /chat/sessions/1db2b89cdde94ee58c80beea9ac14a89?user_id=2&role=faculty HTTP/1.1" 200 -

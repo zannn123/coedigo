@@ -1,5 +1,8 @@
 from collections import defaultdict
+from dataclasses import replace
+import re
 
+from chart_generator import generate_chart
 from context_manager import (
     create_or_get_session,
     delete_session as delete_chat_session,
@@ -16,6 +19,7 @@ from database_tools import (
     ChatbotDatabaseError,
     clear_chat_history,
     get_attendance_concerns,
+    get_authorized_student_grade_records,
     get_class_performance_summary,
     get_chat_history,
     get_high_risk_students,
@@ -31,15 +35,17 @@ from database_tools import (
     normalize_role,
     validate_user,
 )
+from entity_extractor import extract_entities
 from feedback_manager import save_feedback as persist_feedback
 from intent_detector import detect_intent
-from memory_manager import get_suggested_followups, update_user_memory
+from memory_manager import extract_profile_memory, get_preferred_name, get_suggested_followups, update_user_memory
 from prompts import (
     DATABASE_ERROR_REPLY,
     NO_PERMISSION_REPLY,
 )
 from response_templates import clarification_payload, fallback_reply, no_matching_record, suggested_followups
 from role_policy import canonicalize_intent_for_role, get_unauthorized_reply, is_intent_allowed
+from web_search import summarize_context, web_lookup
 
 
 class AcademicChatbot:
@@ -64,16 +70,11 @@ class AcademicChatbot:
             session_state = get_session_state(user_id, role, session_id)
             intent = detect_intent(message, role=role, context=context, session_state=session_state)
             canonical_intent = canonicalize_intent_for_role(intent.intent, role)
-            intent = intent.__class__(
-                canonical_intent,
-                intent.subject_hint,
-                intent.confidence,
-                intent.source,
-                intent.needs_clarification,
-            )
+            intent = replace(intent, intent=canonical_intent)
 
             needs_clarification = False
             custom_suggestions = None
+            graph_data = None
 
             if not is_intent_allowed(intent.intent, role):
                 reply = get_unauthorized_reply()
@@ -91,7 +92,14 @@ class AcademicChatbot:
                 custom_suggestions = clarification.get("suggestions", [])
                 needs_clarification = True
             else:
-                reply = self._dispatch(user_id, role, message, intent, context)
+                dispatch_result = self._dispatch(user_id, role, message, intent, context, session_state, user)
+                if isinstance(dispatch_result, dict):
+                    reply = dispatch_result.get("reply", "")
+                    needs_clarification = bool(dispatch_result.get("needs_clarification"))
+                    custom_suggestions = dispatch_result.get("suggestions")
+                    graph_data = dispatch_result.get("graph")
+                else:
+                    reply = dispatch_result
 
             message_id = save_message(
                 user_id=user_id,
@@ -110,7 +118,7 @@ class AcademicChatbot:
                 last_result_type=None if needs_clarification else intent.intent,
                 pending_clarification=intent.intent if needs_clarification else None,
             )
-            update_user_memory(user_id, role, intent.intent)
+            update_user_memory(user_id, role, intent.intent, message)
             suggestions = custom_suggestions or self._suggestions(user_id, role, intent.intent)
 
             response = {
@@ -124,6 +132,14 @@ class AcademicChatbot:
             }
             if needs_clarification:
                 response["needs_clarification"] = True
+            if graph_data:
+                # Support both old format (dict with type/data) and new format (dict with url)
+                if isinstance(graph_data, dict):
+                    if graph_data.get("url"):
+                        response["graph_url"] = graph_data["url"]
+                        response["graph_type"] = "image"
+                    elif graph_data.get("type"):
+                        response["graph"] = graph_data
             return response
         except ChatbotDatabaseError:
             return {"reply": DATABASE_ERROR_REPLY, "_status": 503}
@@ -262,7 +278,19 @@ class AcademicChatbot:
                 suggestions.append(suggestion)
         return suggestions[:3]
 
-    def _dispatch(self, user_id, role, message, intent, context=None):
+    def _dispatch(self, user_id, role, message, intent, context=None, session_state=None, user=None):
+        if intent.intent == "small_talk_greeting":
+            return self._format_greeting(user_id, role, message, user)
+
+        if intent.intent == "identity_recall":
+            return self._format_identity_recall(user_id, role, user)
+
+        if intent.intent == "web_search":
+            return web_lookup(message)
+
+        if intent.intent == "summarize":
+            return summarize_context(context or [])
+
         if intent.intent == "schedule_today":
             return self._format_schedule(
                 get_user_schedule_today(user_id, role),
@@ -290,6 +318,11 @@ class AcademicChatbot:
                 return "This subject list inquiry is available for student accounts only."
             return self._format_subjects(get_student_subjects(user_id))
 
+        if intent.intent == "student_grade_lookup":
+            if role == "student":
+                return "Students can only ask about their own grades. Ask: Show my grades."
+            return self._format_authorized_student_grade_lookup(user_id, role, message, context or [], session_state or {})
+
         if intent.intent in {"current_grade", "subject_grade"}:
             if role != "student":
                 return (
@@ -298,6 +331,88 @@ class AcademicChatbot:
                 )
             grades = get_student_grades(user_id, intent.subject_hint)
             return self._format_grades(grades, message, intent.subject_hint)
+
+        if intent.intent == "report_graph":
+            # NEW: Use chart_generator for actual PNG graph generation
+            entities = extract_entities(message, intent.intent, context or [], session_state or {})
+            
+            if role == "student":
+                chart_result = generate_chart(user_id, role, entities, intent.intent)
+                if isinstance(chart_result, dict) and chart_result.get("error"):
+                    return chart_result["error"]
+                if isinstance(chart_result, dict) and chart_result.get("graph_url"):
+                    return {
+                        "reply": chart_result.get("summary", "Here is your performance graph."),
+                        "graph": {
+                            "type": "image",
+                            "url": chart_result["graph_url"],
+                            "path": chart_result.get("graph_path")
+                        }
+                    }
+            else:
+                student_name = entities.get("student_name")
+                subject_hint = entities.get("subject_hint") or intent.subject_hint
+                
+                if student_name:
+                    chart_result = generate_chart(user_id, role, entities, intent.intent)
+                    if isinstance(chart_result, dict) and chart_result.get("error"):
+                        return chart_result["error"]
+                    if isinstance(chart_result, dict) and chart_result.get("graph_url"):
+                        return {
+                            "reply": chart_result.get("summary", f"Here is the performance graph for {student_name}."),
+                            "graph": {
+                                "type": "image",
+                                "url": chart_result["graph_url"],
+                                "path": chart_result.get("graph_path")
+                            }
+                        }
+                else:
+                    chart_result = generate_chart(user_id, role, entities, intent.intent)
+                    if isinstance(chart_result, dict) and chart_result.get("error"):
+                        return chart_result["error"]
+                    if isinstance(chart_result, dict) and chart_result.get("graph_url"):
+                        return {
+                            "reply": chart_result.get("summary", "Here is the class performance graph."),
+                            "graph": {
+                                "type": "image",
+                                "url": chart_result["graph_url"],
+                                "path": chart_result.get("graph_path")
+                            }
+                        }
+        
+        # Handle new graph intents
+        if intent.intent in {"student_graph", "student_grade_graph", "student_attendance_graph", 
+                            "student_risk_graph", "class_performance_graph", "class_attendance_graph",
+                            "class_risk_graph", "high_risk_chart"}:
+            entities = extract_entities(message, intent.intent, context or [], session_state or {})
+            chart_result = generate_chart(user_id, role, entities, intent.intent)
+            
+            if isinstance(chart_result, dict) and chart_result.get("error"):
+                error_msg = chart_result["error"]
+                needs_clarification = chart_result.get("needs_clarification", False)
+                clarification_options = chart_result.get("clarification_options", [])
+                
+                if needs_clarification:
+                    return {
+                        "reply": error_msg,
+                        "needs_clarification": True,
+                        "suggestions": clarification_options[:3] if clarification_options else [
+                            "Specify subject code",
+                            "Show all subjects",
+                            "List students"
+                        ]
+                    }
+                return error_msg
+            
+            if isinstance(chart_result, dict) and chart_result.get("graph_url"):
+                return {
+                    "reply": chart_result.get("summary", "Here is your graph."),
+                    "graph": {
+                        "type": "image",
+                        "url": chart_result["graph_url"],
+                        "path": chart_result.get("graph_path")
+                    }
+                }
 
         if intent.intent in {"risk_status", "improvement_advice", "explain_risk"}:
             if role != "student":
@@ -368,6 +483,9 @@ class AcademicChatbot:
 
         if intent.intent in {"explain_previous_result", "show_more_details", "explain_student_risk"}:
             return self._format_previous_result_explanation(user_id, role, message, context or [])
+
+        if intent.intent == "web_search":
+            return web_lookup(message)
 
         return fallback_reply(role)
 
@@ -470,6 +588,131 @@ class AcademicChatbot:
         return reply
 
     @staticmethod
+    def _format_greeting(user_id, role, message, user=None):
+        profile = extract_profile_memory(message)
+        preferred_name = profile.get("preferred_name") or get_preferred_name(user_id, role)
+        display_name = preferred_name or (user or {}).get("first_name") or "there"
+        if profile.get("preferred_name"):
+            return (
+                f"Hi {display_name}. I’ll remember that name for our chats. "
+                "Ask me about schedules, grades, attendance, missing work, or student risk records."
+            )
+        return (
+            f"Hi {display_name}. I can help with schedules, grades, attendance, missing work, "
+            "student risk, and class performance records."
+        )
+
+    @staticmethod
+    def _format_identity_recall(user_id, role, user=None):
+        preferred_name = get_preferred_name(user_id, role)
+        if preferred_name:
+            return f"You told me your name is {preferred_name}."
+
+        full_name = (user or {}).get("full_name")
+        if full_name:
+            return f"You are signed in as {full_name}."
+        return "I do not have a preferred name saved yet. Tell me your name with: my name is Zann."
+
+    def _format_authorized_student_grade_lookup(self, user_id, role, message, context, session_state):
+        entities = _extract_student_grade_entities(message, context, session_state)
+        student_name = entities.get("student_name")
+        subject_hint = entities.get("subject_hint")
+
+        if not student_name:
+            return {
+                "reply": "Which student should I check?",
+                "needs_clarification": True,
+                "suggestions": ["Grade of student name", "Show students needing attention"],
+            }
+
+        rows = get_authorized_student_grade_records(user_id, role, student_name, subject_hint)
+        if not rows and subject_hint:
+            candidates = get_authorized_student_grade_records(user_id, role, student_name, None)
+            if candidates:
+                student = _student_name(candidates[0])
+                subjects = _subject_suggestions(candidates)
+                return {
+                    "reply": (
+                        f"I found {student}, but no handled class matched \"{subject_hint}\". "
+                        f"Available subject options: {', '.join(subjects)}."
+                    ),
+                    "needs_clarification": True,
+                    "suggestions": subjects[:3],
+                }
+
+        if not rows:
+            return (
+                f"No grade record was found for \"{student_name}\" in your authorized scope. "
+                "Check the spelling or ask for students needing attention."
+            )
+
+        student_groups = defaultdict(list)
+        for row in rows:
+            student_groups[int(row.get("student_user_id") or 0)].append(row)
+
+        if len(student_groups) > 1:
+            options = []
+            for group_rows in list(student_groups.values())[:5]:
+                row = group_rows[0]
+                context_text = _student_context(row)
+                options.append(f"{_student_name(row)}{context_text}")
+            return {
+                "reply": "I found multiple matching students. Which one do you mean? " + "; ".join(options) + ".",
+                "needs_clarification": True,
+                "suggestions": [_student_name(group_rows[0]) for group_rows in list(student_groups.values())[:3]],
+            }
+
+        if not subject_hint and len(_unique_subject_keys(rows)) > 1:
+            student = _student_name(rows[0])
+            subjects = _subject_suggestions(rows)
+            return {
+                "reply": (
+                    f"I found {len(rows)} class records for {student}. "
+                    f"Which subject do you want? Options: {', '.join(subjects)}."
+                ),
+                "needs_clarification": True,
+                "suggestions": subjects[:3],
+            }
+
+        return self._format_authorized_grade_rows(rows)
+
+    @staticmethod
+    def _format_authorized_grade_rows(rows):
+        lines = []
+        for row in rows[:6]:
+            student = _student_name(row)
+            subject = _subject_label(row)
+            section = row.get("section")
+            section_text = f", section {section}" if section else ""
+            status = (row.get("grade_status") or "draft").replace("_", " ")
+
+            if row.get("weighted_score") is None:
+                lines.append(
+                    f"{student}'s record for {subject}{section_text}: no computed grade is recorded yet "
+                    f"(class status: {status})."
+                )
+                continue
+
+            parts = [
+                f"current weighted score {_format_percent(row.get('weighted_score'))}",
+            ]
+            if row.get("midterm_grade") is not None:
+                parts.append(f"midterm {_format_percent(row.get('midterm_grade'))}")
+            if row.get("final_term_score") is not None:
+                parts.append(f"final term {_format_percent(row.get('final_term_score'))}")
+            if row.get("final_grade") is not None:
+                parts.append(f"final grade {float(row.get('final_grade')):.2f}")
+            if row.get("remarks"):
+                parts.append(f"remarks {row.get('remarks')}")
+            parts.append(f"class status {status}")
+            lines.append(f"{student}'s record for {subject}{section_text}: " + ", ".join(parts) + ".")
+
+        reply = " ".join(lines)
+        if len(rows) > 6:
+            reply += f" {len(rows) - 6} more matching class record(s) were found."
+        return reply
+
+    @staticmethod
     def _format_grades(rows, message, subject_hint):
         if not rows:
             if subject_hint:
@@ -489,6 +732,59 @@ class AcademicChatbot:
         if len(rows) > 8:
             reply += f" {len(rows) - 8} more grade records were found."
         return reply
+
+    @staticmethod
+    def _format_student_performance_graph(rows, subject_hint, student_name=None):
+        if not rows:
+            if student_name:
+                return f"No grade record was found for {student_name}."
+            return "No grade record was found."
+        
+        visible = [row for row in rows if row.get("weighted_score") is not None]
+        if not visible:
+            return "No computed grades are available to generate a graph."
+        
+        data = []
+        for row in visible[:10]:
+            subject = row.get("subject_code") or "Unknown"
+            score = float(row.get("weighted_score"))
+            data.append({"name": subject, "score": round(score, 2)})
+            
+        reply_msg = f"Here is the performance graph for {student_name}." if student_name else "Here is the performance graph for your enrolled subjects."
+        return {
+            "reply": reply_msg,
+            "graph": {
+                "type": "bar",
+                "title": f"Subject Grades ({student_name})" if student_name else "Subject Grades",
+                "data": data,
+                "dataKey": "score"
+            }
+        }
+
+    @staticmethod
+    def _format_class_performance_graph(rows, role):
+        if not rows:
+            return "No class summary records found to generate a graph."
+        
+        data = []
+        for row in rows[:10]:
+            subject = row.get("subject_code") or "Unknown"
+            score = float(row.get("average_weighted_score") or 0)
+            if score > 0:
+                data.append({"name": subject, "average_score": round(score, 2)})
+                
+        if not data:
+            return "No sufficient score data to generate a graph."
+            
+        return {
+            "reply": f"Here is the average performance graph across classes.",
+            "graph": {
+                "type": "bar",
+                "title": "Average Class Performance",
+                "data": data,
+                "dataKey": "average_score"
+            }
+        }
 
     @staticmethod
     def _format_student_risk(rows):
@@ -746,6 +1042,112 @@ def _subject_label(row):
     if code and name:
         return f"{code} - {name}"
     return name or code or "Unnamed subject"
+
+
+def _student_name(row):
+    return row.get("student_name") or "Unnamed student"
+
+
+def _unique_subject_keys(rows):
+    keys = []
+    for row in rows:
+        key = (row.get("class_id"), row.get("subject_code"), row.get("section"))
+        if key not in keys:
+            keys.append(key)
+    return keys
+
+
+def _subject_suggestions(rows):
+    suggestions = []
+    for row in rows:
+        label = row.get("subject_code") or row.get("subject_name") or "Unnamed subject"
+        section = row.get("section")
+        if section:
+            label = f"{label} {section}"
+        if label not in suggestions:
+            suggestions.append(label)
+    return suggestions[:8]
+
+
+def _extract_student_grade_entities(message, context, session_state):
+    subject_hint = _extract_lookup_subject_hint(message, session_state)
+    student_name = _extract_lookup_student_name(message)
+
+    if not student_name:
+        for row in reversed(context or []):
+            if row.get("detected_intent") != "student_grade_lookup":
+                continue
+            student_name = _extract_lookup_student_name(row.get("user_message") or "")
+            if student_name:
+                break
+
+    return {
+        "student_name": student_name,
+        "subject_hint": subject_hint,
+    }
+
+
+def _extract_lookup_student_name(message):
+    original = (message or "").strip()
+    if not original:
+        return None
+
+    patterns = [
+        r"\b(?:grade|grades|score|mark|standing)\s+(?:of|for|ni|kay)\s+(.+?)(?:\s+(?:in|under|from|subject)\s+|[?.!,]|$)",
+        r"\b(?:show|check|get|display|view)\s+(.+?)['’]?\s+(?:grade|grades|score|mark|standing)(?:\s+(?:in|under|from|subject)\s+|[?.!,]|$)",
+        r"\b(?:what|how)\s+(?:is|are)\s+(.+?)['’]?\s+(?:grade|grades|score|mark|standing)(?:\s+(?:in|under|from|subject)\s+|[?.!,]|$)",
+        r"\bhow\s+(?:is|s)\s+(.+?)\s+(?:doing|performing)(?:\s+(?:in|under|from|subject)\s+|[?.!,]|$)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, original, flags=re.IGNORECASE)
+        if match:
+            name = _clean_lookup_name(match.group(1))
+            if name:
+                return name
+    return None
+
+
+def _extract_lookup_subject_hint(message, session_state=None):
+    original = (message or "").strip()
+    if not original:
+        return None
+
+    code_match = re.search(r"\b([A-Z]{2,6}\s*\d{2,4}[A-Z]?)\b", original, flags=re.IGNORECASE)
+    if code_match:
+        return " ".join(code_match.group(1).upper().split())
+
+    patterns = [
+        r"\b(?:in|under|subject)\s+([a-zA-Z0-9\s&.-]{2,80})(?:[?.!,]|$)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, original, flags=re.IGNORECASE)
+        if match:
+            value = _clean_subject_lookup(match.group(1))
+            if value:
+                return value
+
+    pending = (session_state or {}).get("pending_clarification")
+    if pending == "student_grade_lookup" and not re.search(r"\b(grade|grades|score|mark|standing)\b", original, flags=re.IGNORECASE):
+        return _clean_subject_lookup(original)
+    return None
+
+
+def _clean_lookup_name(value):
+    value = re.sub(r"\b(the|student|current|final|grade|grades|score|mark|standing|please|pls)\b", " ", value or "", flags=re.IGNORECASE)
+    value = re.sub(r"[^a-zA-Z0-9\s.'-]", " ", value)
+    value = " ".join(value.split()).strip(" .'-")
+    if not value or len(value) < 2:
+        return None
+    if value.lower() in {"my", "me", "mine", "student"}:
+        return None
+    return value[:80]
+
+
+def _clean_subject_lookup(value):
+    value = re.sub(r"\b(please|pls|subject|class|grade|grades|score|mark|standing)\b", " ", value or "", flags=re.IGNORECASE)
+    value = re.sub(r"[^a-zA-Z0-9\s&.-]", " ", value)
+    value = " ".join(value.split()).strip(" .-&")
+    return value[:80] if len(value) >= 2 else None
 
 
 def _student_context(row):
