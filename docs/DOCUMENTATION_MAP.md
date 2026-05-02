@@ -14,7 +14,8 @@ docs/
 │
 ├── 🚀 setup/
 │   ├── QUICK_START.md          → 5-minute setup
-│   └── INSTALLATION.md         → Complete installation
+│   ├── INSTALLATION.md         → Complete installation
+│   └── XAMPP_WINDOWS.md        → Windows XAMPP setup and recovery
 │
 ├── ✨ features/
 │   ├── ATTENDANCE_WEIGHT.md    → Customizable attendance (0-100%)
@@ -74,9 +75,10 @@ docs/
 ### Setting Up Project
 ```
 1. Read: docs/setup/QUICK_START.md
-2. Run: mysql -u root -p < database/coedigo.sql
-3. Run: mysql -u root -p coedigo_db < database/migration_attendance_weight.sql
-4. Test: php backend/test-db.php
+2. Windows + XAMPP: read docs/setup/XAMPP_WINDOWS.md
+3. Run: mysql -u root -p < database/coedigo.sql
+4. Run: mysql -u root -p coedigo_db < database/migration_attendance_weight.sql
+5. Test: php backend/test-db.php
 ```
 
 ### Fixing Database Errors

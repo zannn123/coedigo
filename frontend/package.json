@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev:backend": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\start-backend.ps1",
-    "dev:fullstack": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\start-backend.ps1 && vite",
+    "dev:fullstack": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\start-xampp.ps1 && powershell -ExecutionPolicy Bypass -File ..\\scripts\\start-backend.ps1 && powershell -ExecutionPolicy Bypass -File ..\\scripts\\start-chatbot.ps1 && vite",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"

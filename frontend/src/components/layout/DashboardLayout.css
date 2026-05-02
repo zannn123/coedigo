@@ -1,6 +1,7 @@
 /* ===== DASHBOARD LAYOUT ===== */
 .dashboard-layout {
   --sidebar-width: 282px;
+  --assistant-width: 64px;
   display: flex;
   min-height: 100vh;
   background: var(--bg-primary);
@@ -8,6 +9,16 @@
 
 .dashboard-layout.sidebar-collapsed {
   --sidebar-width: 84px;
+}
+
+.dashboard-layout.assistant-expanded {
+  --assistant-width: 406px;
+}
+
+@media (max-width: 1180px) {
+  .dashboard-layout.assistant-expanded {
+    --assistant-width: 372px;
+  }
 }
 
 /* ===== SIDEBAR ===== */
@@ -277,18 +288,24 @@
   flex: 1;
   min-width: 0;
   margin-left: calc(var(--sidebar-width) + 2rem);
+  margin-right: calc(var(--assistant-width) + 1.25rem);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   background: var(--bg-primary);
-  transition: margin-left 240ms ease-out;
+  transition: margin-left 240ms ease-out, margin-right 240ms ease-out;
 }
 
 /* ===== TOPBAR ===== */
 .topbar {
   height: 60px;
-  background: var(--topbar-bg);
-  border-bottom: 1px solid var(--border);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--topbar-bg) 96%, transparent) 0%,
+      color-mix(in srgb, var(--topbar-bg) 86%, transparent) 100%
+    );
+  border-bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -296,8 +313,34 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 10px 30px rgba(154, 71, 8, 0.045);
   backdrop-filter: blur(12px);
+}
+
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 1.5rem;
+  right: 1.5rem;
+  bottom: 0;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(212, 101, 11, 0.18), transparent);
+  pointer-events: none;
+}
+
+[data-theme='dark'] .topbar {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--topbar-bg) 98%, transparent) 0%,
+      color-mix(in srgb, var(--topbar-bg) 88%, transparent) 100%
+    );
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+[data-theme='dark'] .topbar::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 147, 47, 0.2), transparent);
 }
 
 .topbar-left {
@@ -732,6 +775,7 @@
   .dashboard-layout,
   .dashboard-layout.sidebar-collapsed {
     --sidebar-width: 0px;
+    --assistant-width: 0px;
   }
 
   .sidebar {
@@ -788,13 +832,18 @@
   }
   .main-area {
     margin-left: 0;
+    margin-right: 0;
   }
   .topbar {
     min-height: 62px;
     height: auto;
     padding: 0.625rem 1rem;
     padding-top: max(0.625rem, env(safe-area-inset-top));
-    background: color-mix(in srgb, var(--topbar-bg) 92%, transparent);
+  }
+
+  .topbar::after {
+    left: 1rem;
+    right: 1rem;
   }
   .topbar-left {
     min-width: 0;
@@ -826,6 +875,10 @@
   .main-content {
     padding: 1rem;
     padding-bottom: max(6rem, calc(env(safe-area-inset-bottom) + 5rem));
+  }
+
+  .dashboard-layout.assistant-expanded .main-content {
+    padding-bottom: max(73vh, calc(env(safe-area-inset-bottom) + 36rem));
   }
   .dropdown-menu {
     position: fixed;

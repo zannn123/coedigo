@@ -21,6 +21,9 @@ Thumbs.db
 # XAMPP
 *.bak
 backend/logs/*.log
+ai_chatbot/.venv/
+ai_chatbot/__pycache__/
+ai_chatbot/logs/*.log
 
 # Skill/Agent files
 .agent/

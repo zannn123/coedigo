@@ -75,6 +75,17 @@ VITE_API_URL=http://localhost:8000/api
 
 ### Step 5: Start Servers (30 seconds)
 
+**Windows + XAMPP - one command:**
+```powershell
+cd frontend
+npm run dev:fullstack
+```
+
+This checks XAMPP, starts the backend, then starts the frontend. phpMyAdmin is available at:
+```text
+http://localhost/phpmyadmin/
+```
+
 **Terminal 1 - Backend:**
 ```bash
 cd backend
@@ -134,6 +145,9 @@ Should show:
 
 ### "Cannot find driver"
 → See [Database Errors](../troubleshooting/DATABASE_ERRORS.md)
+
+### phpMyAdmin will not load
+→ See [XAMPP Windows Setup](XAMPP_WINDOWS.md)
 
 ### "Access denied"
 → Check MySQL password in `backend/config/database.php`

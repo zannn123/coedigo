@@ -11,7 +11,8 @@ Complete documentation for the COEDIGO system.
 ### 🚀 Getting Started
 1. **[Quick Start](setup/QUICK_START.md)** - Get running in 5 minutes
 2. **[Installation Guide](setup/INSTALLATION.md)** - Complete setup instructions
-3. **[Configuration](setup/CONFIGURATION.md)** - Environment and settings
+3. **[XAMPP Windows Setup](setup/XAMPP_WINDOWS.md)** - Local XAMPP ports, phpMyAdmin, and recovery steps
+4. **[Configuration](setup/CONFIGURATION.md)** - Environment and settings
 
 ### ✨ Features
 1. **[Attendance Weight](features/ATTENDANCE_WEIGHT.md)** - Customizable attendance grading
@@ -52,6 +53,7 @@ docs/
 ├── setup/                    # Installation and configuration
 │   ├── QUICK_START.md       # 5-minute setup
 │   ├── INSTALLATION.md      # Complete installation
+│   ├── XAMPP_WINDOWS.md     # Local Windows XAMPP setup
 │   └── CONFIGURATION.md     # Settings and environment
 │
 ├── features/                 # Feature documentation

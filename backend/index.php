@@ -166,6 +166,16 @@ elseif (preg_match('#^/api/classes/(\d+)/status$#', $path, $m) && $method === 'P
     (new ClassController())->updateStatus($m[1]);
 }
 
+// --- FACULTY DASHBOARD ROUTES ---
+elseif ($path === '/api/faculty/dashboard' && $method === 'GET') {
+    require_once __DIR__ . '/controllers/FacultyDashboardController.php';
+    (new FacultyDashboardController())->index();
+}
+elseif ($path === '/api/faculty/absence-warning' && $method === 'POST') {
+    require_once __DIR__ . '/controllers/FacultyDashboardController.php';
+    (new FacultyDashboardController())->sendAbsenceWarning();
+}
+
 // --- GRADE ROUTES ---
 elseif (preg_match('#^/api/grades/class/(\d+)$#', $path, $m) && $method === 'GET') {
     require_once __DIR__ . '/controllers/GradeController.php';

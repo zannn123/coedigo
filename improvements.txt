@@ -1,4 +1,4 @@
-clean settings ui across all user role
-separate view or clean view that separates midterm and final
-drop down for attendance(simplified)
+clean settings ui across all user role✅
+separate view or clean view that separates midterm and final✅
+drop down for attendance(simplified)final✅
 add analytics (remind student warning for drop) the faculty can make student status drop

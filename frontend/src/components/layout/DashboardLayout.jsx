@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Menu, X, LogOut, Bell, ChevronDown, ChevronLeft, ChevronRight, Settings, CheckCheck, CheckCircle2, XCircle, FileText, Mail, Phone, UserRound } from 'lucide-react';
 import ThemeToggleButton from '../theme/ThemeToggleButton';
+import AcademicAssistantRail from './AcademicAssistantRail';
 import api from '../../services/api';
 import './DashboardLayout.css';
 
@@ -14,6 +15,7 @@ export default function DashboardLayout({ navItems }) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1');
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -301,7 +303,7 @@ export default function DashboardLayout({ navItems }) {
   };
 
   return (
-    <div className={`dashboard-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`dashboard-layout has-assistant-rail ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${assistantOpen ? 'assistant-expanded' : ''}`}>
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-brand">
@@ -461,6 +463,8 @@ export default function DashboardLayout({ navItems }) {
           <Outlet />
         </main>
       </div>
+
+      <AcademicAssistantRail open={assistantOpen} onOpenChange={setAssistantOpen} />
 
       <nav className="mobile-nav-dock" aria-label="Primary mobile navigation">
         {navItems.map(item => (

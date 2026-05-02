@@ -548,14 +548,30 @@ class GradeController {
 
         $midterm = $this->calculateTermStats($terms['midterm'], $attendanceTerms['midterm'], $examWeight, $quizWeight, $projWeight, $attendanceWeight);
         $final = $this->calculateTermStats($terms['final'], $attendanceTerms['final'], $examWeight, $quizWeight, $projWeight, $attendanceWeight);
-        $hasAny = $midterm['has_scores'] || $final['has_scores'];
+        $hasMidterm = $this->termHasScoredComponents($terms['midterm']);
+        $hasFinal = $this->termHasScoredComponents($terms['final']);
+        $hasCompleteSubjectGrade = $hasMidterm && $hasFinal;
 
         $examAvg = $this->averagePresentValues([$midterm['major_exam_avg'], $final['major_exam_avg']]) ?? 0;
         $quizAvg = $this->averagePresentValues([$midterm['quiz_avg'], $final['quiz_avg']]) ?? 0;
         $projAvg = $this->averagePresentValues([$midterm['project_avg'], $final['project_avg']]) ?? 0;
-        $weighted = $hasAny ? (($midterm['weighted_score'] ?? 0) * 0.5) + (($final['weighted_score'] ?? 0) * 0.5) : 0;
-        $finalGrade = $this->mapToGradeScale($weighted, $gradeScale);
-        $remarks = $finalGrade <= $passingGrade ? 'Passed' : 'Failed';
+        if ($hasCompleteSubjectGrade) {
+            $weighted = (($midterm['weighted_score'] ?? 0) * 0.5) + (($final['weighted_score'] ?? 0) * 0.5);
+            $finalGrade = $this->mapToGradeScale($weighted, $gradeScale);
+            $remarks = $finalGrade <= $passingGrade ? 'Passed' : 'Failed';
+        } elseif ($hasFinal) {
+            $weighted = $final['weighted_score'] ?? 0;
+            $finalGrade = null;
+            $remarks = 'No Grade';
+        } elseif ($hasMidterm) {
+            $weighted = $midterm['weighted_score'] ?? 0;
+            $finalGrade = null;
+            $remarks = 'No Grade';
+        } else {
+            $weighted = 0;
+            $finalGrade = null;
+            $remarks = 'No Grade';
+        }
 
         $existing = $this->db->prepare("SELECT id FROM grades WHERE enrollment_id = ?");
         $existing->execute([$enrollmentId]);
@@ -751,6 +767,17 @@ class GradeController {
             'weighted_score' => $weighted,
             'has_scores' => $hasScores,
         ];
+    }
+
+    private function termHasScoredComponents($termComponents) {
+        foreach (['major_exam', 'quiz', 'project'] as $category) {
+            foreach ($termComponents[$category] ?? [] as $component) {
+                if (is_numeric($component['score'] ?? null)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private function transmutedAverage($components) {
