@@ -22,6 +22,7 @@ from database_tools import (
     get_authorized_student_grade_records,
     get_class_performance_summary,
     get_chat_history,
+    get_faculty_subject_students,
     get_high_risk_students,
     get_missing_activities,
     get_student_grades,
@@ -46,10 +47,12 @@ from prompts import (
 from response_templates import clarification_payload, fallback_reply, no_matching_record, suggested_followups
 from role_policy import canonicalize_intent_for_role, get_unauthorized_reply, is_intent_allowed
 from web_search import summarize_context, web_lookup
+from groq_provider import groq_chat
+
 
 
 class AcademicChatbot:
-    def handle_message(self, user_id, role, message, session_id=None):
+    def handle_message(self, user_id, role, message, session_id=None, ai_model="local", user_name=None):
         user_id = self._normalize_user_id(user_id)
         role = normalize_role(role)
         message = (message or "").strip()
@@ -74,9 +77,38 @@ class AcademicChatbot:
 
             needs_clarification = False
             custom_suggestions = None
+            clarification_options = []
             graph_data = None
+            pending = (session_state.get("pending_clarification") or "").strip()
+            normalized_message = _normalize_short_reply(message)
 
-            if not is_intent_allowed(intent.intent, role):
+            if pending == "web_search" and _is_affirmative_reply(normalized_message):
+                search_topic = _last_pending_web_topic(context) or message
+                intent = replace(intent, intent="web_search", confidence=0.96, source="confirmed_web_search")
+                if ai_model == "groq":
+                    groq_res = groq_chat(message=search_topic, context=context, user_name=user_name, user_id=user_id)
+                    reply = groq_res.get("reply", "")
+                else:
+                    reply = web_lookup(search_topic)
+            elif pending == "web_search" and _is_negative_reply(normalized_message):
+                intent = replace(intent, intent="unknown", confidence=0.9, source="declined_web_search")
+                reply = _declined_search_reply(role)
+                custom_suggestions = _starter_suggestions(role)
+            elif pending and _is_short_acknowledgement(normalized_message):
+                intent = replace(intent, intent=pending if pending in {"schedule_clarification", "clarify_date"} else "unknown", confidence=max(float(intent.confidence or 0), 0.74), source="pending_acknowledgement")
+                clarification = clarification_payload(pending, role)
+                reply = clarification["reply"] if pending in {"schedule_clarification", "clarify_date"} else _starter_reply(role)
+                custom_suggestions = clarification.get("suggestions", []) if pending in {"schedule_clarification", "clarify_date"} else _starter_suggestions(role)
+                needs_clarification = pending in {"schedule_clarification", "clarify_date"}
+            elif ai_model == "groq" and _should_answer_with_groq_direct(message, intent):
+                groq_res = groq_chat(message=message, context=context, user_name=user_name, user_id=user_id)
+                reply = groq_res.get("reply", "")
+            elif _should_offer_web_search(message, intent):
+                intent = replace(intent, intent="web_search", confidence=max(float(intent.confidence or 0), 0.61), source="web_search_confirmation", needs_clarification=True)
+                reply = _web_search_confirmation_reply(message, role)
+                custom_suggestions = ["Yes, search online", "No, ask about academic records", *_starter_suggestions(role)[:1]]
+                needs_clarification = True
+            elif not is_intent_allowed(intent.intent, role):
                 reply = get_unauthorized_reply()
             elif intent.intent in {"schedule_clarification", "clarify_date"} or intent.needs_clarification:
                 clarification = clarification_payload(intent.intent, role)
@@ -93,13 +125,39 @@ class AcademicChatbot:
                 needs_clarification = True
             else:
                 dispatch_result = self._dispatch(user_id, role, message, intent, context, session_state, user)
-                if isinstance(dispatch_result, dict):
-                    reply = dispatch_result.get("reply", "")
-                    needs_clarification = bool(dispatch_result.get("needs_clarification"))
-                    custom_suggestions = dispatch_result.get("suggestions")
-                    graph_data = dispatch_result.get("graph")
+                
+                if ai_model == "groq":
+                    if intent.intent in {"web_search", "unknown", "small_talk_greeting", "summarize", "identity_recall"}:
+                        groq_res = groq_chat(message=message, context=context, user_name=user_name, user_id=user_id)
+                        reply = groq_res.get("reply", "")
+                    else:
+                        if isinstance(dispatch_result, dict):
+                            local_reply = dispatch_result.get("reply", "")
+                            needs_clarification = bool(dispatch_result.get("needs_clarification"))
+                            custom_suggestions = dispatch_result.get("suggestions")
+                            clarification_options = dispatch_result.get("clarification_options") or []
+                            graph_data = dispatch_result.get("graph")
+                        else:
+                            local_reply = dispatch_result
+
+                        prompt = (
+                            f"The user asked: '{message}'.\n\n"
+                            f"Authorized database-grounded result: '{local_reply}'\n\n"
+                            "Rewrite the result clearly and concisely. Do not add names, grades, "
+                            "schedules, risk levels, attendance values, or academic facts that are not "
+                            "present in the authorized result."
+                        )
+                        groq_res = groq_chat(message=prompt, context=context, user_name=user_name, user_id=user_id)
+                        reply = groq_res.get("reply", local_reply)
                 else:
-                    reply = dispatch_result
+                    if isinstance(dispatch_result, dict):
+                        reply = dispatch_result.get("reply", "")
+                        needs_clarification = bool(dispatch_result.get("needs_clarification"))
+                        custom_suggestions = dispatch_result.get("suggestions")
+                        clarification_options = dispatch_result.get("clarification_options") or []
+                        graph_data = dispatch_result.get("graph")
+                    else:
+                        reply = dispatch_result
 
             message_id = save_message(
                 user_id=user_id,
@@ -126,16 +184,25 @@ class AcademicChatbot:
                 "intent": intent.intent,
                 "confidence": round(float(intent.confidence), 3),
                 "role": role,
+                "model": ai_model,
                 "session_id": session_id,
                 "message_id": message_id,
                 "suggested_questions": suggestions,
             }
             if needs_clarification:
                 response["needs_clarification"] = True
+            if clarification_options:
+                response["clarification_options"] = clarification_options
             if graph_data:
                 # Support both old format (dict with type/data) and new format (dict with url)
                 if isinstance(graph_data, dict):
                     if graph_data.get("url"):
+                        response["graph"] = {
+                            "type": "image",
+                            "url": graph_data["url"],
+                            "path": graph_data.get("path"),
+                            "title": graph_data.get("title") or "Generated graph",
+                        }
                         response["graph_url"] = graph_data["url"]
                         response["graph_type"] = "image"
                     elif graph_data.get("type"):
@@ -318,6 +385,11 @@ class AcademicChatbot:
                 return "This subject list inquiry is available for student accounts only."
             return self._format_subjects(get_student_subjects(user_id))
 
+        if intent.intent == "faculty_subject_students":
+            if role != "faculty":
+                return "This class list inquiry is available for faculty accounts only."
+            return self._format_faculty_subject_students(get_faculty_subject_students(user_id))
+
         if intent.intent == "student_grade_lookup":
             if role == "student":
                 return "Students can only ask about their own grades. Ask: Show my grades."
@@ -338,47 +410,23 @@ class AcademicChatbot:
             
             if role == "student":
                 chart_result = generate_chart(user_id, role, entities, intent.intent)
-                if isinstance(chart_result, dict) and chart_result.get("error"):
-                    return chart_result["error"]
-                if isinstance(chart_result, dict) and chart_result.get("graph_url"):
-                    return {
-                        "reply": chart_result.get("summary", "Here is your performance graph."),
-                        "graph": {
-                            "type": "image",
-                            "url": chart_result["graph_url"],
-                            "path": chart_result.get("graph_path")
-                        }
-                    }
+                formatted = _format_chart_dispatch_result(chart_result, "Here is your performance graph.")
+                if formatted:
+                    return formatted
             else:
                 student_name = entities.get("student_name")
                 subject_hint = entities.get("subject_hint") or intent.subject_hint
                 
                 if student_name:
                     chart_result = generate_chart(user_id, role, entities, intent.intent)
-                    if isinstance(chart_result, dict) and chart_result.get("error"):
-                        return chart_result["error"]
-                    if isinstance(chart_result, dict) and chart_result.get("graph_url"):
-                        return {
-                            "reply": chart_result.get("summary", f"Here is the performance graph for {student_name}."),
-                            "graph": {
-                                "type": "image",
-                                "url": chart_result["graph_url"],
-                                "path": chart_result.get("graph_path")
-                            }
-                        }
+                    formatted = _format_chart_dispatch_result(chart_result, f"Here is the performance graph for {student_name}.")
+                    if formatted:
+                        return formatted
                 else:
                     chart_result = generate_chart(user_id, role, entities, intent.intent)
-                    if isinstance(chart_result, dict) and chart_result.get("error"):
-                        return chart_result["error"]
-                    if isinstance(chart_result, dict) and chart_result.get("graph_url"):
-                        return {
-                            "reply": chart_result.get("summary", "Here is the class performance graph."),
-                            "graph": {
-                                "type": "image",
-                                "url": chart_result["graph_url"],
-                                "path": chart_result.get("graph_path")
-                            }
-                        }
+                    formatted = _format_chart_dispatch_result(chart_result, "Here is the class performance graph.")
+                    if formatted:
+                        return formatted
         
         # Handle new graph intents
         if intent.intent in {"student_graph", "student_grade_graph", "student_attendance_graph", 
@@ -388,31 +436,11 @@ class AcademicChatbot:
             chart_result = generate_chart(user_id, role, entities, intent.intent)
             
             if isinstance(chart_result, dict) and chart_result.get("error"):
-                error_msg = chart_result["error"]
-                needs_clarification = chart_result.get("needs_clarification", False)
-                clarification_options = chart_result.get("clarification_options", [])
-                
-                if needs_clarification:
-                    return {
-                        "reply": error_msg,
-                        "needs_clarification": True,
-                        "suggestions": clarification_options[:3] if clarification_options else [
-                            "Specify subject code",
-                            "Show all subjects",
-                            "List students"
-                        ]
-                    }
-                return error_msg
+                formatted = _format_chart_dispatch_result(chart_result, "Here is your graph.")
+                return formatted or chart_result["error"]
             
             if isinstance(chart_result, dict) and chart_result.get("graph_url"):
-                return {
-                    "reply": chart_result.get("summary", "Here is your graph."),
-                    "graph": {
-                        "type": "image",
-                        "url": chart_result["graph_url"],
-                        "path": chart_result.get("graph_path")
-                    }
-                }
+                return _format_chart_dispatch_result(chart_result, "Here is your graph.")
 
         if intent.intent in {"risk_status", "improvement_advice", "explain_risk"}:
             if role != "student":
@@ -583,6 +611,45 @@ class AcademicChatbot:
         reply = "Your enrolled subjects are: " + "; ".join(parts)
         if len(rows) > 10:
             reply += f"; and {len(rows) - 10} more."
+        else:
+            reply += "."
+        return reply
+
+    @staticmethod
+    def _format_faculty_subject_students(rows):
+        if not rows:
+            return "No handled subject or enrolled student record was found for your faculty account."
+
+        parts = []
+        total_students = 0
+        for row in rows[:8]:
+            subject = _subject_label(row)
+            section = row.get("section")
+            schedule = (row.get("schedule") or "no schedule recorded").strip()
+            room = (row.get("room") or "no room recorded").strip()
+            count = int(row.get("student_count") or 0)
+            total_students += count
+            names = [
+                name.strip()
+                for name in str(row.get("student_names") or "").split("||")
+                if name.strip()
+            ]
+            shown = ", ".join(names[:6]) if names else "no enrolled students listed"
+            if len(names) > 6:
+                shown += f", and {len(names) - 6} more"
+            section_text = f" section {section}" if section else ""
+            parts.append(
+                f"{subject}{section_text}: {count} enrolled student(s), "
+                f"{schedule}, {room}. Students: {shown}"
+            )
+
+        reply = (
+            f"Your handled subjects/classes include {len(rows)} class record(s) "
+            f"with {total_students} enrolled student(s) in the listed classes: "
+            + "; ".join(parts)
+        )
+        if len(rows) > 8:
+            reply += f"; and {len(rows) - 8} more class record(s)."
         else:
             reply += "."
         return reply
@@ -982,10 +1049,14 @@ class AcademicChatbot:
             subject_context = f"{subject} section {section}" if section else subject
             average = _format_percent(row.get("average_weighted_score"))
             low_count = int(row.get("low_grade_count") or 0)
+            midterm_count = int(row.get("midterm_below_count") or 0)
+            final_count = int(row.get("final_below_count") or 0)
+            subject_count = int(row.get("subject_below_count") or 0)
             missing_count = int(row.get("missing_activity_student_count") or 0)
             attendance_count = int(row.get("poor_attendance_count") or 0)
             highlights.append(
-                f"{subject_context} has average {average}, {low_count} low-grade student(s), "
+                f"{subject_context} has average {average}, {low_count} below-target performance case(s) "
+                f"({subject_count} subject, {final_count} final, {midterm_count} midterm), "
                 f"{attendance_count} poor-attendance student(s), and {missing_count} student(s) with missing activities"
             )
 
@@ -1001,14 +1072,14 @@ class AcademicChatbot:
         reply = (
             f"{summary_label}: based on {scope}, {len(rows)} class record(s) and "
             f"{total_students} enrollment(s) were found. Monitoring indicators: "
-            f"{total_low} low-grade case(s), {total_attendance} attendance concern(s), "
+            f"{total_low} below-target performance case(s), {total_attendance} attendance concern(s), "
             f"and {total_missing} missing-activity concern(s)."
         )
         if highlights:
             reply += " Classes needing attention: " + "; ".join(highlights) + "."
         else:
             reply += " No major class-level risk indicators were found in the available records."
-        reply += " Suggested action: prioritize consultation and follow-up for classes with repeated low-grade, attendance, or missing-activity indicators."
+        reply += " Suggested action: prioritize consultation and follow-up for classes with repeated below-target term performance, attendance, or missing-activity indicators."
         return reply
 
     @staticmethod
@@ -1067,6 +1138,189 @@ def _subject_suggestions(rows):
         if label not in suggestions:
             suggestions.append(label)
     return suggestions[:8]
+
+
+def _format_chart_dispatch_result(chart_result, fallback_reply):
+    if not isinstance(chart_result, dict):
+        return None
+
+    if chart_result.get("error"):
+        options = chart_result.get("clarification_options") or []
+        suggestion_labels = [
+            option.get("label") if isinstance(option, dict) else str(option)
+            for option in options
+        ]
+        return {
+            "reply": chart_result["error"],
+            "needs_clarification": bool(chart_result.get("needs_clarification")),
+            "suggestions": suggestion_labels[:3] if suggestion_labels else [
+                "Specify student name",
+                "Show class performance graph",
+                "Show students needing attention",
+            ],
+            "clarification_options": options,
+        }
+
+    if chart_result.get("graph_url"):
+        return {
+            "reply": chart_result.get("summary", fallback_reply),
+            "graph": {
+                "type": "image",
+                "url": chart_result["graph_url"],
+                "path": chart_result.get("graph_path"),
+                "title": chart_result.get("title") or "Generated graph",
+            },
+        }
+
+    return None
+
+
+def _normalize_short_reply(message):
+    value = re.sub(r"[^a-z0-9\s]", " ", (message or "").lower())
+    return " ".join(value.split())
+
+
+def _is_affirmative_reply(text):
+    return text in {
+        "yes",
+        "y",
+        "yeah",
+        "yep",
+        "sure",
+        "ok",
+        "okay",
+        "go",
+        "go ahead",
+        "please do",
+        "do it",
+        "search",
+        "search it",
+        "search web",
+        "search the web",
+        "search online",
+        "search this online",
+        "yes search",
+        "yes search it",
+        "yes search the web",
+        "yes search online",
+    } or text.startswith("yes ") or text.startswith("ok ") or text.startswith("okay ")
+
+
+def _is_negative_reply(text):
+    return text in {
+        "no",
+        "n",
+        "nope",
+        "nah",
+        "cancel",
+        "dont",
+        "don t",
+        "do not",
+        "never mind",
+        "nevermind",
+        "no thanks",
+        "not now",
+    } or text.startswith("no ")
+
+
+def _is_short_acknowledgement(text):
+    return _is_affirmative_reply(text) or _is_negative_reply(text) or text in {"alright", "not sure"}
+
+
+def _should_offer_web_search(message, intent):
+    text = _normalize_short_reply(message)
+    if not text or _is_short_acknowledgement(text):
+        return False
+    if intent.intent == "web_search" and getattr(intent, "source", "") == "web_lookup":
+        return False
+    if intent.intent == "web_search" and float(intent.confidence or 0) < 0.75:
+        return True
+    if intent.intent == "unknown" and _looks_searchable_outside_academics(text):
+        return True
+    return False
+
+
+def _should_answer_with_groq_direct(message, intent):
+    if intent.intent in {"web_search", "unknown", "small_talk_greeting", "identity_recall", "summarize"}:
+        return True
+    if float(intent.confidence or 0) < 0.75 and not _looks_private_academic_request(message):
+        return True
+    return False
+
+
+def _looks_private_academic_request(message):
+    text = _normalize_short_reply(message)
+    academic_terms = {
+        "grade", "grades", "score", "scores", "schedule", "class", "classes",
+        "attendance", "risk", "student", "students", "subject", "subjects",
+        "missing", "activity", "activities", "midterm", "final", "finals",
+        "section", "program", "enrolled", "failing", "below", "performance",
+    }
+    return bool(set(text.split()) & academic_terms)
+
+
+def _looks_searchable_outside_academics(text):
+    if len(text) < 3:
+        return False
+    academic_words = {
+        "grade", "grades", "schedule", "class", "classes", "attendance", "risk",
+        "student", "students", "subject", "subjects", "missing", "activity",
+        "activities", "midterm", "final", "finals", "section", "program",
+    }
+    words = set(text.split())
+    if words & academic_words:
+        return False
+    return bool(re.search(r"[a-z0-9]", text))
+
+
+def _web_search_confirmation_reply(message, role):
+    topic = (message or "").strip()
+    return (
+        f"I’m not sure if “{topic}” is an academic-record request. "
+        f"Do you want me to search this online, or would you like to ask about your { _role_scope_label(role) }?"
+    )
+
+
+def _declined_search_reply(role):
+    return f"No problem. How may I help you today? You can ask about { _role_scope_label(role) }."
+
+
+def _starter_reply(role):
+    return f"How may I help you today? You can ask about { _role_scope_label(role) }."
+
+
+def _role_scope_label(role):
+    if role == "student":
+        return "schedule, grades, attendance, missing activities, or risk status"
+    if role == "faculty":
+        return "class summaries, high-risk students, attendance concerns, or missing activities"
+    if role == "dean":
+        return "college performance, program risks, high-risk overviews, or attendance concerns"
+    if role == "program_chair":
+        return "program summaries, section performance, high-risk students, or subject concerns"
+    return "academic records, performance summaries, risks, attendance, or missing activities"
+
+
+def _starter_suggestions(role):
+    if role == "student":
+        return ["Show my schedule today", "Show my grades", "Am I at risk?"]
+    if role == "faculty":
+        return ["Summarize my class performance", "Show high-risk students", "Show missing activities"]
+    if role == "dean":
+        return ["Show overall performance", "Show high-risk overview", "Show attendance concerns"]
+    if role == "program_chair":
+        return ["Show program summary", "Show section summary", "Show subject concerns"]
+    return ["Show overall performance", "Show high-risk overview", "Show attendance concerns"]
+
+
+def _last_pending_web_topic(context):
+    for row in reversed(context or []):
+        if row.get("detected_intent") != "web_search":
+            continue
+        message = (row.get("user_message") or "").strip()
+        if message and not _is_short_acknowledgement(_normalize_short_reply(message)):
+            return message
+    return None
 
 
 def _extract_student_grade_entities(message, context, session_state):
@@ -1178,7 +1432,8 @@ def _filter_low_grade_students(rows):
     return [
         row
         for row in rows
-        if (row.get("current_grade") is not None and float(row.get("current_grade")) < 75)
+        if row.get("term_performance_status") in {"midterm_below_target", "final_below_target", "subject_below_target"}
+        or (row.get("current_grade") is not None and float(row.get("current_grade")) < 75)
         or (row.get("final_grade") is not None and str(row.get("remarks") or "").lower() == "failed")
         or row.get("risk_level") == "High Risk"
     ]

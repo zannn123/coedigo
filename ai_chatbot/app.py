@@ -39,6 +39,8 @@ def chat():
         role=payload.get("role"),
         message=payload.get("message"),
         session_id=payload.get("session_id"),
+        ai_model=payload.get("ai_model", "local"),
+        user_name=payload.get("user_name"),
     )
 
     status_code = response.pop("_status", 200)

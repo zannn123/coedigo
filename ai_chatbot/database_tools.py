@@ -325,12 +325,26 @@ def get_authorized_student_grade_records(user_id, role, student_name=None, subje
             g.final_grade,
             NULL AS overall_grade,
             g.remarks,
-            g.computed_at
+            g.computed_at,
+            att.total_sessions,
+            att.present_count,
+            att.absent_count,
+            att.attendance_points
         FROM enrollments e
         INNER JOIN users stu ON stu.id = e.student_id
         INNER JOIN class_records cr ON cr.id = e.class_record_id
         INNER JOIN subjects s ON s.id = cr.subject_id
         LEFT JOIN grades g ON g.enrollment_id = e.id
+        LEFT JOIN (
+            SELECT
+                enrollment_id,
+                COUNT(*) AS total_sessions,
+                SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) AS present_count,
+                SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) AS absent_count,
+                SUM(points) AS attendance_points
+            FROM attendance_records
+            GROUP BY enrollment_id
+        ) att ON att.enrollment_id = e.id
         WHERE e.is_active = 1
           AND cr.is_active = 1
           AND {' AND '.join(clauses)}
@@ -343,6 +357,9 @@ def get_authorized_student_grade_records(user_id, role, student_name=None, subje
     rows = _apply_term_performance(rows)
     for row in rows:
         row["can_view_grade"] = True
+        total_sessions = int(row.get("total_sessions") or 0)
+        attendance_points = _to_float(row.get("attendance_points")) or 0.0
+        row["attendance_percentage"] = round((attendance_points / total_sessions) * 100, 2) if total_sessions else None
     return rows
 
 
@@ -353,6 +370,43 @@ def get_student_risk_status(user_id):
 
 def get_faculty_students_needing_attention(user_id):
     return get_students_needing_attention(user_id, "faculty")
+
+
+def get_faculty_subject_students(user_id, limit=20):
+    limit = max(1, min(int(limit), 50))
+    return _query_all(
+        f"""
+        SELECT
+            cr.id AS class_id,
+            cr.section,
+            cr.academic_year,
+            cr.semester,
+            cr.schedule,
+            cr.room,
+            cr.grade_status,
+            s.code AS subject_code,
+            s.name AS subject_name,
+            s.units,
+            COUNT(e.id) AS student_count,
+            GROUP_CONCAT(
+                DISTINCT CONCAT_WS(' ', stu.first_name, stu.middle_name, stu.last_name)
+                ORDER BY stu.last_name, stu.first_name
+                SEPARATOR '||'
+            ) AS student_names
+        FROM class_records cr
+        INNER JOIN subjects s ON s.id = cr.subject_id
+        LEFT JOIN enrollments e
+            ON e.class_record_id = cr.id
+           AND e.is_active = 1
+        LEFT JOIN users stu ON stu.id = e.student_id
+        WHERE cr.faculty_id = %s
+          AND cr.is_active = 1
+        GROUP BY cr.id
+        ORDER BY cr.academic_year DESC, cr.semester DESC, s.code, cr.section
+        LIMIT {limit}
+        """,
+        (int(user_id),),
+    )
 
 
 def get_students_needing_attention(user_id, role, limit=20):
@@ -399,6 +453,9 @@ def get_class_performance_summary(user_id, role):
             "_scores": [],
             "_attendance": [],
             "low_grade_count": 0,
+            "midterm_below_count": 0,
+            "final_below_count": 0,
+            "subject_below_count": 0,
             "poor_attendance_count": 0,
             "missing_activity_student_count": 0,
         })
@@ -409,6 +466,12 @@ def get_class_performance_summary(user_id, role):
             item["_scores"].append(score)
             if score < 75 or row.get("term_performance_status") in {"midterm_below_target", "final_below_target", "subject_below_target"}:
                 item["low_grade_count"] += 1
+        if row.get("term_performance_status") == "midterm_below_target":
+            item["midterm_below_count"] += 1
+        elif row.get("term_performance_status") == "final_below_target":
+            item["final_below_count"] += 1
+        elif row.get("term_performance_status") == "subject_below_target":
+            item["subject_below_count"] += 1
 
         total_sessions = int(row.get("total_sessions") or 0)
         attendance_points = _to_float(row.get("attendance_points")) or 0.0
@@ -859,7 +922,9 @@ def _decorate_risk_row(row, expose_unverified_grade):
             "exam_avg": exam_avg,
             "remarks": remarks,
             "midterm_grade": midterm_grade,
+            "final_term_score": _to_float(row.get("final_term_score")) if can_view_grade else None,
             "final_grade": final_grade,
+            "term_performance_status": row.get("term_performance_status"),
         }
     )
 

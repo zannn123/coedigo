@@ -296,6 +296,20 @@ function performanceStatusLabel(status) {
   return 'Below target';
 }
 
+function performanceReasonText(reason) {
+  if (!reason) return '';
+  const label = reason.label || performanceStatusLabel(`${reason.type}_below_target`);
+  const score = reason.score === null || reason.score === undefined ? '' : ` ${formatPercent(reason.score, 1)}`;
+  return `${label}${score}`;
+}
+
+function pendingTermText(item) {
+  if (!item?.has_final_scores) return 'Final pending';
+  if (!item?.has_midterm_scores) return 'Midterm pending';
+  if (!item?.subject_score && item?.subject_score !== 0) return 'Subject pending';
+  return '';
+}
+
 function FacultyTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -394,7 +408,7 @@ export default function FacultyDashboard() {
     {
       label: 'Low Performance',
       value: summary.low_performance_students,
-      detail: `${summary.midterm_below_target} midterm / ${summary.final_below_target} final`,
+      detail: `${summary.subject_below_target} subject / ${summary.final_below_target} final / ${summary.midterm_below_target} midterm`,
       icon: TrendingDown,
       tone: 'warning',
       progress: summary.low_score_line,
@@ -588,6 +602,12 @@ export default function FacultyDashboard() {
                     <div className="faculty-low-info">
                       <strong>{item.full_name || 'Student'}</strong>
                       <span>{formatClassMeta(item)}</span>
+                      <div className="faculty-low-reasons">
+                        {(item.reasons || []).slice(0, 3).map(reason => (
+                          <em key={`${reason.type}-${reason.score}`}>{performanceReasonText(reason)}</em>
+                        ))}
+                        {pendingTermText(item) && <em className="is-pending">{pendingTermText(item)}</em>}
+                      </div>
                     </div>
 
                     <div className="faculty-low-metrics" aria-label="Term performance scores">

@@ -32,6 +32,7 @@ SUPPORTED_INTENTS = {
     "explain_risk",
     "class_summary",
     "students_needing_attention",
+    "faculty_subject_students",
     "high_risk_students",
     "low_grade_students",
     "poor_attendance_students",
@@ -99,22 +100,26 @@ def detect_intent(message: str, role=None, context=None, session_state=None) -> 
     if _is_identity_question(text):
         return IntentResult("identity_recall", confidence=0.96, source="personal_memory")
 
+    # Check pure greeting BEFORE stripping, so a bare "hi" still gets greeted
     if _is_small_talk_greeting(text):
         return IntentResult("small_talk_greeting", confidence=0.88, source="personal_memory")
 
-    keyword = _detect_keyword_intent(text, role)
+    # Strip a leading greeting prefix so "hi who is elon musk?" → "who is elon musk?"
+    core_text = _strip_greeting_prefix(text)
 
-    follow_up = _detect_context_follow_up(text, role, context, session_state, keyword)
+    keyword = _detect_keyword_intent(core_text, role)
+
+    follow_up = _detect_context_follow_up(core_text, role, context, session_state, keyword)
     if follow_up.intent != "unknown":
         return follow_up
 
     if keyword.intent != "unknown":
         return keyword
 
-    model_intent, model_confidence = predict_intent_with_model(text)
+    model_intent, model_confidence = predict_intent_with_model(core_text)
     model_intent = MODEL_INTENT_ALIASES.get(model_intent, model_intent)
 
-    semantic = match_intent(text, role)
+    semantic = match_intent(core_text, role)
     semantic_intent = MODEL_INTENT_ALIASES.get(semantic.intent, semantic.intent)
 
     if semantic_intent in SUPPORTED_INTENTS and semantic.score >= 0.58:
@@ -123,16 +128,16 @@ def detect_intent(message: str, role=None, context=None, session_state=None) -> 
             confidence = min(0.96, model_confidence)
         return IntentResult(
             semantic_intent,
-            extract_subject_hint(text),
+            extract_subject_hint(core_text),
             confidence,
             source=f"semantic:{semantic.example}",
         )
 
     if model_intent in SUPPORTED_INTENTS and model_confidence >= 0.5:
-        return IntentResult(model_intent, extract_subject_hint(text), model_confidence, "reviewed_model")
+        return IntentResult(model_intent, extract_subject_hint(core_text), model_confidence, "reviewed_model")
 
-    # Fallback to web search for out-of-domain queries if it looks like a real sentence
-    if len(text.split()) >= 3 and not _has_any(text, ["hi", "hello", "hey"]):
+    # Fallback: if it looks like a real question/sentence, search the web
+    if len(core_text.split()) >= 2:
         return IntentResult("web_search", confidence=0.4, source="fallback_out_of_domain")
 
     return IntentResult("unknown", confidence=0.2, source="fallback")
@@ -181,6 +186,23 @@ def _detect_keyword_intent(text: str, role=None) -> IntentResult:
 
     if text in {"this week", "week", "weekly"}:
         return IntentResult("schedule_week", confidence=0.76, source="short_date")
+
+    if role == "faculty" and _has_any(text, [
+        "my subject and students",
+        "my subjects and students",
+        "list of my subject and students",
+        "list of my subjects and students",
+        "list my subject and students",
+        "list my subjects and students",
+        "my handled subjects",
+        "handled subjects",
+        "my students",
+        "list my students",
+        "who are my students",
+        "students in my subjects",
+        "students in my classes",
+    ]):
+        return IntentResult("faculty_subject_students", confidence=0.93)
 
     if _has_any(text, ["my subjects", "subjects this semester", "enrolled subjects", "subjects enrolled", "subject list"]):
         return IntentResult("enrolled_subjects", confidence=0.9)
@@ -277,7 +299,16 @@ def _detect_keyword_intent(text: str, role=None) -> IntentResult:
             return IntentResult("college_summary", confidence=0.9)
         return IntentResult("class_summary", confidence=0.82)
 
-    if _has_any(text, ["generate graph", "show graph", "graph of", "graph for", "report graph", "performance graph", "chart of", "generate report", "create graph", "create chart", "make graph", "make chart", "visualize", "show chart"]):
+    if _has_any(text, [
+        "generate graph", "show graph", "graph of", "graph for", "report graph",
+        "performance graph", "chart of", "generate report", "create graph",
+        "create chart", "make graph", "make chart", "visualize", "show chart",
+        "draw graph", "draw chart", "plot", "bar chart", "line chart",
+        "pie chart", "visual report", "graph my", "chart my",
+        "show me a graph", "show me a chart", "turn this into a graph",
+        "data visualization", "data visual", "visualize performance",
+        "risk chart", "student risk chart", "attendance chart", "grade chart",
+    ]):
         subject_hint = extract_subject_hint(text)
         if _has_any(text, ["attendance"]):
             if _has_any(text, ["class", "classes", "my class", "students"]):
@@ -306,7 +337,7 @@ def _detect_keyword_intent(text: str, role=None) -> IntentResult:
     if _has_any(text, ["missing activity", "missing activities", "missing requirement", "missing requirements", "not submitted", "incomplete submissions"]):
         return IntentResult("missing_activity_students" if role != "student" else "missing_activities", confidence=0.92)
 
-    if _has_any(text, ["low grade students", "students with low grades", "below passing", "below 75", "failing grade"]):
+    if _has_any(text, ["low grade students", "students with low grades", "below passing", "below 75", "failing grade", "below target students", "students below target", "low performance students", "students low performance"]):
         return IntentResult("low_grade_students", confidence=0.88)
 
     if _has_any(text, ["high risk students", "who is high risk", "who is failing", "list failing students", "danger students", "high risk"]):
@@ -356,13 +387,15 @@ def _detect_context_follow_up(text, role, context, session_state, keyword_result
     if _has_any(text, ["show only high risk", "only high risk", "high risk only", "filter high risk"]):
         return IntentResult("show_only_high_risk", confidence=0.88, source="context_follow_up")
 
-    if _has_any(text, ["attendance", "absent", "absence", "absences"]):
+    strong_standalone = keyword_result and keyword_result.intent != "unknown" and keyword_result.confidence > 0.85
+
+    if last_result_type and not strong_standalone and _has_any(text, ["attendance", "absent", "absence", "absences"]):
         return IntentResult("show_attendance_details", confidence=0.84, source="context_follow_up")
 
-    if _has_any(text, ["missing activities", "requirements", "missing", "not submitted"]):
+    if last_result_type and not strong_standalone and _has_any(text, ["missing activities", "requirements", "missing", "not submitted"]):
         return IntentResult("show_missing_activity_details", confidence=0.84, source="context_follow_up")
 
-    if _has_any(text, ["what date", "which date", "what day", "when"]):
+    if last_result_type and not strong_standalone and _has_any(text, ["what date", "which date", "what day", "when"]):
         return IntentResult("clarify_date", confidence=0.76, source="context_follow_up", needs_clarification=True)
 
     if text in {"yes", "ok", "okay", "sure"} and last_result_type:
@@ -452,13 +485,39 @@ def _is_identity_question(text: str) -> bool:
 
 
 def _is_web_search(text: str) -> bool:
-    academic_words = {"grade", "grades", "schedule", "class", "classes", "attendance", "risk", "student", "students", "subject", "subjects"}
+    academic_words = {"grade", "grades", "schedule", "class", "classes", "attendance", "risk", "student", "students", "subject", "subjects", "failing", "failed", "passing", "absent", "missing"}
     words = set(text.split())
     if words & academic_words:
         return False
-    if _has_any(text, ["search the web", "search online", "search internet", "search through internet", "search throught internet", "look up online", "internet search", "web search"]):
+    if _has_any(text, [
+        "search the web", "search online", "search internet",
+        "search through internet", "search throught internet",
+        "look up online", "internet search", "web search",
+        "search on the web",
+    ]):
         return True
-    return bool(re.match(r"^(what is|who is|where is|define|look up)\s+.{3,}$", text))
+    # Matches: "who is X", "what is X", "where is X", "when did X", "why is X", "how does X"
+    return bool(re.match(
+        r"^(what is|who is|where is|when (is|did|was)|why (is|was|did)|how (does|did|do|is)|define|look up)\s+.{2,}$",
+        text,
+    ))
+
+
+def _strip_greeting_prefix(text: str) -> str:
+    """
+    Strips a leading polite greeting so that
+    'hi who is elon musk' → 'who is elon musk'
+    'hello, what is machine learning?' → 'what is machine learning?'
+    Returns the original text unchanged if no greeting prefix is found.
+    """
+    stripped = re.sub(
+        r"^(hi+|hey+|hello+|good\s+(?:morning|afternoon|evening|day))[,!.\s]+",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    ).strip()
+    # Only use the stripped version if meaningful content remains
+    return stripped if len(stripped) >= 2 else text
 
 
 def _looks_like_subject_or_student_answer(text: str) -> bool:

@@ -62,7 +62,7 @@ $dependencyOut = Join-Path $logDir 'dependency-check.out.log'
 $dependencyErr = Join-Path $logDir 'dependency-check.err.log'
 $dependencyCheck = Start-Process `
     -FilePath $venvPython `
-    -ArgumentList @('-c', 'import flask, flask_cors, mysql.connector, dotenv, requests, sklearn') `
+    -ArgumentList @('-c', '"import flask, flask_cors, mysql.connector, dotenv, requests, sklearn"') `
     -Wait `
     -PassThru `
     -RedirectStandardOutput $dependencyOut `
@@ -97,9 +97,15 @@ Start-Process `
     -RedirectStandardError $stderrLog `
     -WindowStyle Hidden
 
-Start-Sleep -Seconds 3
+$started = $null
+for ($attempt = 0; $attempt -lt 40; $attempt++) {
+    Start-Sleep -Milliseconds 500
+    $started = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($started) {
+        break
+    }
+}
 
-$started = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $started) {
     Write-Error "Failed to start COEDIGO AI chatbot on http://127.0.0.1:$Port. Check $stderrLog"
     exit 1

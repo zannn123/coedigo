@@ -1,5 +1,6 @@
 import hashlib
 import os
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -153,14 +154,22 @@ def _generate_student_chart_for_faculty(user_id, role, student_name, graph_type,
     
     # Multiple students matched
     if len(student_groups) > 1:
-        names = [rows[0].get("student_name") for rows in student_groups.values()]
+        options = [_student_option(rows[0], student_name) for rows in student_groups.values()]
+        names = [option["label"] for option in options]
         return {
-            "error": f"Multiple students match '{student_name}': {', '.join(names[:3])}. Please be more specific.",
-            "needs_clarification": True
+            "error": f"Did you mean one of these students for \"{student_name}\"?",
+            "needs_clarification": True,
+            "clarification_options": options[:6],
         }
     
     student_rows = list(student_groups.values())[0]
     actual_name = student_rows[0].get("student_name", student_name)
+
+    if graph_type == "attendance":
+        return _generate_student_attendance_graph(student_rows, actual_name, subject_hint)
+
+    if graph_type == "risk":
+        return _generate_student_risk_graph(student_rows, actual_name)
     
     # Group by subject to check if we need clarification
     subject_groups = {}
@@ -170,26 +179,19 @@ def _generate_student_chart_for_faculty(user_id, role, student_name, graph_type,
             subject_groups[subject_key] = []
         subject_groups[subject_key].append(row)
     
-    # Multiple subjects and no hint - ask for clarification
+    # Multiple subjects and no hint: show an overview graph. Subject-specific
+    # clarification is only needed when the user explicitly asks for one subject.
     if len(subject_groups) > 1 and not subject_hint:
-        subject_list = []
-        for (code, section), _ in list(subject_groups.items())[:5]:
-            if section:
-                subject_list.append(f"{code} (Section {section})")
-            else:
-                subject_list.append(code)
-        
-        return {
-            "error": f"{actual_name} is enrolled in {len(subject_groups)} subjects. Which subject? Options: {', '.join(subject_list)}",
-            "needs_clarification": True,
-            "clarification_options": subject_list
-        }
+        return _generate_student_all_subjects_graph(student_rows, actual_name, graph_type)
     
     # Single subject or subject specified - generate detailed component graph
     if subject_hint or len(subject_groups) == 1:
         # Get the specific subject data
         if subject_hint:
-            target_rows = student_rows
+            target_rows = [
+                row for row in student_rows
+                if _matches_subject(row, subject_hint)
+            ] or student_rows
         else:
             target_rows = list(subject_groups.values())[0]
         
@@ -198,6 +200,79 @@ def _generate_student_chart_for_faculty(user_id, role, student_name, graph_type,
     
     # Fallback: show all subjects
     return _generate_student_all_subjects_graph(student_rows, actual_name, graph_type)
+
+
+def _generate_student_attendance_graph(rows, student_name, subject_hint=None):
+    target_rows = [
+        row for row in rows
+        if not subject_hint or _matches_subject(row, subject_hint)
+    ]
+
+    data = []
+    seen = set()
+    for row in target_rows[:10]:
+        attendance = row.get("attendance_percentage")
+        if attendance is None:
+            continue
+        subject = row.get("subject_code") or "Unknown"
+        section = row.get("section")
+        key = (subject, section)
+        if key in seen:
+            continue
+        seen.add(key)
+        label = f"{subject} ({section})" if section else subject
+        data.append({"subject": label, "value": float(attendance)})
+
+    if not data:
+        suffix = f" for {subject_hint}" if subject_hint else ""
+        return {"error": f"No attendance data available for {student_name}{suffix}."}
+
+    data.sort(key=lambda item: item["value"])
+    filename = _generate_bar_chart(
+        data,
+        f"Attendance - {student_name}",
+        "Subject",
+        "Attendance %",
+        "student_attendance",
+    )
+
+    low = [item for item in data if item["value"] < 75]
+    summary = (
+        f"{student_name}'s attendance ranges from {min(item['value'] for item in data):.1f}% "
+        f"to {max(item['value'] for item in data):.1f}% across {len(data)} subject(s)."
+    )
+    if low:
+        summary += f" {len(low)} subject(s) are below the 75% attendance target."
+
+    return {
+        "graph_url": f"{CHART_URL_PREFIX}/{filename}",
+        "graph_path": str(CHART_DIR / filename),
+        "summary": summary,
+    }
+
+
+def _generate_student_risk_graph(rows, student_name):
+    risk_counts = {"High Risk": 0, "Medium Risk": 0, "Low Risk": 0}
+    for row in rows:
+        level = row.get("risk_level") or "Low Risk"
+        if level in risk_counts:
+            risk_counts[level] += 1
+
+    data = [{"label": level, "value": count} for level, count in risk_counts.items() if count]
+    if not data:
+        return {"error": f"No risk data available for {student_name}."}
+
+    filename = _generate_pie_chart(data, f"Risk Distribution - {student_name}")
+    summary = (
+        f"{student_name} has {risk_counts['High Risk']} high-risk, "
+        f"{risk_counts['Medium Risk']} medium-risk, and {risk_counts['Low Risk']} low-risk subject record(s)."
+    )
+
+    return {
+        "graph_url": f"{CHART_URL_PREFIX}/{filename}",
+        "graph_path": str(CHART_DIR / filename),
+        "summary": summary,
+    }
 
 
 def _generate_student_component_graph(rows, student_name, graph_type):
@@ -213,7 +288,21 @@ def _generate_student_component_graph(rows, student_name, graph_type):
     # Get component scores
     data = []
     
-    # Quiz average
+    # Term scores make it clear whether the record is midterm-only, final-only,
+    # or already a completed subject result.
+    midterm = row.get("midterm_grade")
+    if midterm is not None:
+        data.append({"component": "Midterm", "score": float(midterm)})
+
+    final_term = row.get("final_term_score")
+    if final_term is not None:
+        data.append({"component": "Final Term", "score": float(final_term)})
+
+    subject_score = row.get("overall_grade")
+    if subject_score is not None:
+        data.append({"component": "Subject Overall", "score": float(subject_score)})
+
+    # Component averages remain useful drill-down signals.
     quiz_avg = row.get("quiz_avg")
     if quiz_avg is not None:
         data.append({"component": "Quiz Average", "score": float(quiz_avg)})
@@ -228,10 +317,9 @@ def _generate_student_component_graph(rows, student_name, graph_type):
     if project_avg is not None:
         data.append({"component": "Project Average", "score": float(project_avg)})
     
-    # Weighted score
     weighted = row.get("weighted_score")
-    if weighted is not None:
-        data.append({"component": "Overall Grade", "score": float(weighted)})
+    if weighted is not None and subject_score is None and midterm is None and final_term is None:
+        data.append({"component": "Current Performance", "score": float(weighted)})
     
     if not data:
         return {"error": f"No computed scores available for {student_name} in {subject_label}"}
@@ -248,7 +336,7 @@ def _generate_student_component_graph(rows, student_name, graph_type):
     ax.set_xlabel('Assessment Component', fontsize=12, fontweight='bold')
     ax.set_ylabel('Score (%)', fontsize=12, fontweight='bold')
     ax.set_title(f'{student_name} - {subject_label}\nPerformance Breakdown', fontsize=14, fontweight='bold')
-    ax.axhline(y=75, color='gray', linestyle='--', linewidth=1, alpha=0.5, label='Passing (75%)')
+    ax.axhline(y=75, color='gray', linestyle='--', linewidth=1, alpha=0.5, label='Target (75%)')
     ax.set_ylim(0, 100)
     ax.legend()
     ax.grid(axis='y', alpha=0.3)
@@ -276,10 +364,15 @@ def _generate_student_component_graph(rows, student_name, graph_type):
     summary += f"Highest: {highest['component']} ({highest['score']:.1f}%), "
     summary += f"Lowest: {lowest['component']} ({lowest['score']:.1f}%). "
     
-    if weighted and float(weighted) < 75:
-        summary += f"Overall grade is {float(weighted):.1f}% - needs improvement."
-    elif weighted:
-        summary += f"Overall grade is {float(weighted):.1f}% - performing well."
+    if subject_score is not None:
+        if float(subject_score) < 75:
+            summary += f"Combined subject performance is {float(subject_score):.1f}%, below the 75% target."
+        else:
+            summary += f"Combined subject performance is {float(subject_score):.1f}%."
+    elif final_term is not None:
+        summary += f"Final-term performance is {float(final_term):.1f}%; subject outcome is still pending until all required data is complete."
+    elif midterm is not None:
+        summary += f"Midterm performance is {float(midterm):.1f}%; final-term and subject outcome are still pending."
     
     return {
         "graph_url": f"{CHART_URL_PREFIX}/{filename}",
@@ -384,15 +477,15 @@ def _generate_class_chart(user_id, role):
     
     if below_passing:
         subjects_list = [d['subject'].replace('\n', ' ') for d in below_passing[:3]]
-        summary += f"{len(below_passing)} subject(s) below passing (75%): {', '.join(subjects_list)}. "
+        summary += f"{len(below_passing)} subject(s) below the 75% target: {', '.join(subjects_list)}. "
     
     if good_performance:
         summary += f"{len(good_performance)} subject(s) performing well (≥80%). "
     
     if below_passing:
-        summary += "Focus intervention on subjects below passing line."
+        summary += "Focus intervention on subjects below the target line."
     else:
-        summary += "All subjects meeting minimum standards."
+        summary += "All subjects meet the current target line."
     
     return {
         "graph_url": f"{CHART_URL_PREFIX}/{filename}",
@@ -498,7 +591,7 @@ def _generate_bar_chart(data, title, xlabel, ylabel, chart_type):
     ax.set_xlabel(xlabel, fontsize=12)
     ax.set_ylabel(ylabel, fontsize=12)
     ax.set_title(title, fontsize=14, fontweight='bold')
-    ax.axhline(y=75, color='gray', linestyle='--', linewidth=1, alpha=0.5, label='Passing (75%)')
+    ax.axhline(y=75, color='gray', linestyle='--', linewidth=1, alpha=0.5, label='Target (75%)')
     ax.legend()
     ax.grid(axis='y', alpha=0.3)
     
@@ -535,3 +628,39 @@ def _safe_filename(prefix):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     random_id = uuid.uuid4().hex[:8]
     return f"{prefix}_{timestamp}_{random_id}.png"
+
+
+def _student_option(row, query):
+    name = row.get("student_name") or "Unnamed student"
+    context = []
+    if row.get("program"):
+        context.append(str(row["program"]))
+    if row.get("year_level"):
+        context.append(f"Year {row['year_level']}")
+    if row.get("section"):
+        context.append(f"Section {row['section']}")
+    return {
+        "label": name,
+        "value": f"Create graph for {name}",
+        "match": _best_match_fragment(name, query),
+        "kind": "student",
+        "meta": " · ".join(context),
+    }
+
+
+def _best_match_fragment(name, query):
+    tokens = [token for token in re.findall(r"[a-z0-9]+", str(query or "").lower()) if len(token) >= 2]
+    lower_name = str(name or "").lower()
+    for token in tokens:
+        if token in lower_name:
+            return token
+    return tokens[0] if tokens else ""
+
+
+def _matches_subject(row, subject_hint):
+    text = str(subject_hint or "").lower()
+    return (
+        text in str(row.get("subject_code") or "").lower()
+        or text in str(row.get("subject_name") or "").lower()
+        or text in str(row.get("section") or "").lower()
+    )

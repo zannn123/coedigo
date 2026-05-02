@@ -18,6 +18,8 @@ def extract_entities(message, intent, context=None, session_state=None):
     if intent in {"student_graph", "student_grade_graph", "student_attendance_graph", "student_risk_graph", "report_graph"}:
         entities["student_name"] = _extract_student_name(text, context, session_state)
         entities["subject_hint"] = _extract_subject_hint(text)
+        if _same_value(entities["student_name"], entities["subject_hint"]):
+            entities["subject_hint"] = None
         entities["graph_type"] = _extract_graph_type(text, intent)
         entities["metric"] = _extract_metric(text)
         entities["date_range"] = _extract_date_range(text)
@@ -43,25 +45,27 @@ def extract_entities(message, intent, context=None, session_state=None):
 
 def _extract_student_name(text, context, session_state):
     patterns = [
-        r"\b(?:graph|chart|show|create|make|generate|visualize)\s+(?:of|for|the)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})",
+        r"\b(?:show|create|make|generate|visualize)\s+(?:a\s+)?(?:graph|chart)\s+(?:of|for|the)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})(?:\s+(?:in|under|subject|for)\s+|[?.!,]|$)",
+        r"\b(?:graph|chart)\s+(?:of|for|the)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})(?:\s+(?:in|under|subject|for)\s+|[?.!,]|$)",
         r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})['']?s?\s+(?:graph|chart|performance|grades|attendance)",
         r"\b(?:student|name)\s+(?:is|called|named)?\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})",
+        r"\b(?:graph|chart|show|create|make|generate|visualize)\s+(?:a\s+)?(?:graph|chart)?\s*(?:of|for|the)?\s*([a-zA-Z][a-zA-Z0-9.'-]{1,}(?:\s+[a-zA-Z][a-zA-Z0-9.'-]{1,}){0,3})(?:\s+(?:in|under|subject|for)\s+|[?.!,]|$)",
     ]
     
     for pattern in patterns:
-        match = re.search(pattern, text)
+        match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
             name = match.group(1).strip()
             if _is_valid_student_name(name):
-                return name
+                return _clean_student_name(name)
     
     pending = session_state.get("pending_clarification")
     if pending in {"student_graph", "student_grade_lookup", "report_graph"}:
         words = text.split()
-        if 2 <= len(words) <= 4 and all(word[0].isupper() for word in words if word):
+        if 1 <= len(words) <= 4 and all(re.match(r"^[a-zA-Z0-9.'-]+$", word) for word in words):
             name = " ".join(words)
             if _is_valid_student_name(name):
-                return name
+                return _clean_student_name(name)
     
     for row in reversed(context):
         if row.get("detected_intent") in {"student_graph", "student_grade_lookup", "report_graph"}:
@@ -78,8 +82,11 @@ def _extract_subject_hint(text):
         return " ".join(code_match.group(1).upper().split())
     
     patterns = [
-        r"\b(?:in|for|of|subject)\s+([A-Za-z0-9\s&.-]{2,60})(?:\s+(?:graph|chart|class|section)|$)",
+        r"\b(?:in|under|subject)\s+([A-Za-z0-9\s&.-]{2,60})(?:\s+(?:graph|chart|class|section)|$)",
     ]
+
+    if not re.search(r"\b(graph|chart|plot|visualize)\b", text, flags=re.IGNORECASE):
+        patterns.append(r"\b(?:for|of)\s+([A-Za-z0-9\s&.-]{2,60})(?:\s+(?:graph|chart|class|section)|$)")
     
     for pattern in patterns:
         match = re.search(pattern, text)
@@ -178,23 +185,30 @@ def _extract_web_search_topic(text):
 
 
 def _is_valid_student_name(name):
-    if not name or len(name) < 3 or len(name) > 60:
+    if not name or len(name) < 2 or len(name) > 60:
         return False
     
     blocked = {
         "my", "me", "mine", "student", "the student", "a student",
         "graph", "chart", "show", "create", "make", "generate",
-        "performance", "grades", "attendance", "risk"
+        "performance", "grades", "attendance", "risk", "example", "sample"
     }
     
     if name.lower() in blocked:
         return False
     
     words = name.split()
-    if len(words) < 2 or len(words) > 4:
+    if len(words) > 4:
         return False
     
     return True
+
+
+def _clean_student_name(name):
+    name = re.sub(r"\s+(?:in|under|subject|for)\s+[a-zA-Z]{2,6}(?:\s*\d{2,4}[A-Z]?)?.*$", " ", name or "", flags=re.IGNORECASE)
+    name = re.sub(r"\b(graph|chart|show|create|make|generate|visualize|for|of|the|student|performance|grades?|attendance|risk|scores?)\b", " ", name, flags=re.IGNORECASE)
+    name = re.sub(r"[^a-zA-Z0-9\s.'-]", " ", name)
+    return " ".join(name.split()).strip()[:60]
 
 
 def _clean_subject_hint(value):
@@ -213,3 +227,9 @@ def _has_intent_keywords(text):
                 "grade", "performance", "attendance", "risk", "student"]
     text_lower = text.lower()
     return any(keyword in text_lower for keyword in keywords)
+
+
+def _same_value(left, right):
+    if not left or not right:
+        return False
+    return re.sub(r"[^a-z0-9]+", "", left.lower()) == re.sub(r"[^a-z0-9]+", "", right.lower())

@@ -3,6 +3,7 @@ import {
   AlertCircle,
   Bot,
   BrainCircuit,
+  ChevronDown,
   ChevronRight,
   History,
   Loader2,
@@ -23,7 +24,18 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import './AcademicAssistantRail.css';
 
+const GroqIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M11.5 2L3 13.5h7.5V22l8.5-11.5h-7.5V2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const CHATBOT_BASE_URL = (import.meta.env.VITE_AI_CHATBOT_BASE_URL || '/ai-chatbot').replace(/\/$/, '');
+
+const AI_MODELS = [
+  { id: 'local',  label: 'Zenx AI',  sub: 'Local AI',  icon: <Sparkles size={14} /> },
+  { id: 'groq',   label: 'Groq',     sub: 'Llama 3',   icon: <GroqIcon />  },
+];
 
 const QUICK_QUESTIONS = {
   student: [
@@ -75,8 +87,33 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [sessionId, setSessionId] = useState(null);
+  const [aiModel, setAiModel] = useState('local');
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [loadingText, setLoadingText] = useState('Analyzing query...');
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const modelMenuRef = useRef(null);
+  const aiModelRef = useRef('local');
+
+  const selectedModel = AI_MODELS.find(m => m.id === aiModel) || AI_MODELS[0];
+
+  useEffect(() => {
+    aiModelRef.current = aiModel;
+  }, [aiModel]);
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingText('Analyzing query...');
+      return;
+    }
+    const stages = ['Analyzing query...', 'Checking context...', 'Processing data...', 'Generating response...'];
+    let step = 0;
+    const interval = setInterval(() => {
+      step = (step + 1) % stages.length;
+      setLoadingText(stages[step]);
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const quickQuestions = QUICK_QUESTIONS[user?.role] || QUICK_QUESTIONS.student;
   const canAsk = Boolean(user?.id && user?.role);
@@ -194,14 +231,37 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
     window.setTimeout(() => inputRef.current?.focus(), 120);
   };
 
+  const handleModelSwitch = (model) => {
+    if (aiModelRef.current === model.id) {
+      setModelMenuOpen(false);
+      return;
+    }
+    aiModelRef.current = model.id;
+    setAiModel(model.id);
+    setModelMenuOpen(false);
+    
+    // Add system notification if chat has already started
+    if (messages.length > 0) {
+      setMessages(current => [
+        ...current, 
+        { id: crypto.randomUUID(), role: 'system', text: `Switched to ${model.label}` }
+      ]);
+      window.setTimeout(() => {
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }, 50);
+    }
+  };
+
   const sendMessage = async (messageText) => {
     const text = messageText.trim();
     if (!text || loading) return;
+    const activeModel = aiModelRef.current;
 
     setActiveView('chat');
     onOpenChange(true);
     setInput('');
     setError('');
+    setModelMenuOpen(false);
     setMessages(current => [...current, { id: crypto.randomUUID(), role: 'user', text }]);
 
     if (!canAsk) {
@@ -222,6 +282,8 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
           role: user.role,
           message: text,
           session_id: sessionId,
+          user_name: user?.first_name || user?.username || null,
+          ai_model: activeModel,
         }),
       });
 
@@ -229,7 +291,10 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
       const data = contentType.includes('application/json')
         ? await response.json().catch(() => ({}))
         : {};
-      const reply = data.reply || buildChatbotFallback(response);
+
+      if (data.session_id) setSessionId(data.session_id);
+
+      const reply = data.reply || 'The assistant returned an unexpected response.';
 
       setMessages(current => [
         ...current,
@@ -240,17 +305,20 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
           role: 'assistant',
           text: reply,
           suggestions: Array.isArray(data.suggested_questions) ? data.suggested_questions : [],
-          graph: data.graph,
+          graph: data.graph || (data.graph_url ? {
+            type: 'image',
+            url: data.graph_url,
+            title: data.graph_type === 'image' ? 'Generated graph' : 'Graph',
+          } : null),
+          clarificationOptions: Array.isArray(data.clarification_options) ? data.clarification_options : [],
+          model: data.model || activeModel,
         },
       ]);
-      if (data.session_id) setSessionId(data.session_id);
       setSessionsLoaded(false);
-
-      if (!response.ok) {
-        setError(reply);
-      }
     } catch {
-      const fallback = 'The academic assistant is unavailable. Start the chatbot API and try again.';
+      const fallback = activeModel === 'groq'
+        ? 'The API model is unavailable. Switch to Zenx AI or check the API setup.'
+        : 'The academic assistant is unavailable. Start the local chatbot API and try again.';
       setError(fallback);
       setMessages(current => [
         ...current,
@@ -423,12 +491,24 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
               </div>
             )}
 
-            {messages.map(message => (
-              <div key={message.id} className={`assistant-message ${message.role === 'user' ? 'from-user' : 'from-assistant'}`}>
+            {messages.map(message => {
+              if (message.role === 'system') {
+                return (
+                  <div key={message.id} className="assistant-system-message">
+                    <div className="assistant-system-bubble">
+                      <Sparkles size={12} className="assistant-system-icon" />
+                      <span>{message.text}</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={message.id} className={`assistant-message ${message.role === 'user' ? 'from-user' : 'from-assistant'}`}>
                 {renderMessageContent(message)}
                 {message.graph && message.graph.type === 'bar' && (
-                  <div className="assistant-graph-container" style={{ marginTop: '12px', height: '180px', width: '100%' }}>
-                    <h4 style={{ fontSize: '12px', margin: '0 0 8px 0', fontWeight: '600' }}>{message.graph.title}</h4>
+                  <div className="assistant-graph-container">
+                    <h4>{message.graph.title}</h4>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={message.graph.data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
                         <XAxis dataKey="name" tick={{fontSize: 10}} interval={0} angle={-30} textAnchor="end" height={40} />
@@ -437,6 +517,27 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
                         <Bar dataKey={message.graph.dataKey} fill="var(--color-primary, #3b82f6)" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
+                  </div>
+                )}
+                {message.graph && message.graph.type === 'image' && (
+                  <figure className="assistant-graph-image">
+                    <img src={resolveGraphUrl(message.graph.url)} alt={message.graph.title || 'Generated academic graph'} />
+                    {message.graph.title && <figcaption>{message.graph.title}</figcaption>}
+                  </figure>
+                )}
+                {message.role === 'assistant' && Array.isArray(message.clarificationOptions) && message.clarificationOptions.length > 0 && (
+                  <div className="assistant-option-list" aria-label="Clarification options">
+                    {message.clarificationOptions.slice(0, 6).map(option => (
+                      <button
+                        key={`${option.kind || 'option'}-${option.value || option.label}`}
+                        type="button"
+                        className="assistant-option-button"
+                        onClick={() => sendMessage(option.value || option.label)}
+                      >
+                        <strong>{highlightMatch(option.label || option.value, option.match)}</strong>
+                        {option.meta && <small>{option.meta}</small>}
+                      </button>
+                    ))}
                   </div>
                 )}
                 {message.role === 'assistant' && message.messageId && (
@@ -471,12 +572,12 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
                   </div>
                 )}
               </div>
-            ))}
+            )})}
 
             {loading && (
               <div className="assistant-message from-assistant assistant-loading-row">
                 <Loader2 size={16} className="assistant-spin" />
-                <span>Retrieving records...</span>
+                <span>{loadingText}</span>
               </div>
             )}
           </div>
@@ -490,27 +591,68 @@ export default function AcademicAssistantRail({ open, onOpenChange }) {
         )}
 
         {activeView === 'chat' && (
-          <form className="assistant-composer" onSubmit={handleSubmit}>
-            <label htmlFor="academic-assistant-message" className="assistant-sr-only">Message</label>
-            <textarea
-              id="academic-assistant-message"
-              ref={inputRef}
-              value={input}
-              onChange={event => setInput(event.target.value)}
-              onKeyDown={event => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  sendMessage(input);
-                }
-              }}
-              placeholder="Ask about academic records"
-              rows={2}
-              disabled={loading}
-            />
-            <button type="submit" className="assistant-send-btn" disabled={loading || !input.trim()} aria-label="Send message">
-              {loading ? <Loader2 size={18} className="assistant-spin" /> : <Send size={18} />}
-            </button>
-          </form>
+          <>
+            <form className="assistant-composer" onSubmit={handleSubmit}>
+              <div className="assistant-model-selector" ref={modelMenuRef}>
+                <button
+                  type="button"
+                  className="assistant-model-trigger"
+                  onClick={() => setModelMenuOpen(v => !v)}
+                  aria-expanded={modelMenuOpen}
+                  aria-haspopup="listbox"
+                >
+                  <span className="assistant-model-icon">{selectedModel.icon}</span>
+                  <span className="assistant-model-name">{selectedModel.label}</span>
+                  <ChevronDown size={12} className={`assistant-model-chevron ${modelMenuOpen ? 'is-flipped' : ''}`} />
+                </button>
+                {modelMenuOpen && (
+                  <div className="assistant-model-menu" role="listbox">
+                    {AI_MODELS.map(model => (
+                      <button
+                        key={model.id}
+                        type="button"
+                        role="option"
+                        aria-selected={model.id === aiModel}
+                        className={`assistant-model-option ${model.id === aiModel ? 'is-active' : ''}`}
+                        onClick={() => handleModelSwitch(model)}
+                      >
+                        <span className="assistant-model-option-icon">{model.icon}</span>
+                        <div className="assistant-model-option-info">
+                          <strong>{model.label}</strong>
+                          <span>{model.sub}</span>
+                        </div>
+                        {model.id === aiModel && <span className="assistant-model-check">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="assistant-composer-input-row">
+                <label htmlFor="academic-assistant-message" className="assistant-sr-only">Message</label>
+                <textarea
+                  id="academic-assistant-message"
+                  ref={inputRef}
+                  value={input}
+                  onChange={event => setInput(event.target.value)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      sendMessage(input);
+                    }
+                  }}
+                  placeholder={aiModel === 'groq' ? 'Ask Groq (Llama 3) anything...' : 'Ask about academic records'}
+                  rows={2}
+                  disabled={loading}
+                />
+                <button type="submit" className="assistant-send-btn" disabled={loading || !input.trim()} aria-label="Send message">
+                  {loading ? <Loader2 size={18} className="assistant-spin" /> : <Send size={18} />}
+                </button>
+              </div>
+            </form>
+            <p className="assistant-disclaimer">
+              AI can make mistakes sometimes. AI is still under training.
+            </p>
+          </>
         )}
       </aside>
 
@@ -616,7 +758,33 @@ function toMessage(item) {
     role: item.role,
     text: item.text,
     graph: item.graph,
+    clarificationOptions: item.clarification_options || [],
   };
+}
+
+function resolveGraphUrl(url) {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith('/ai-chatbot/')) return url;
+  if (url.startsWith('/')) return `${CHATBOT_BASE_URL}${url}`;
+  return `${CHATBOT_BASE_URL}/${url}`;
+}
+
+function highlightMatch(label, match) {
+  const text = String(label || '');
+  const needle = String(match || '').trim();
+  if (!needle) return text;
+
+  const index = text.toLowerCase().indexOf(needle.toLowerCase());
+  if (index < 0) return text;
+
+  return (
+    <>
+      {text.slice(0, index)}
+      <mark>{text.slice(index, index + needle.length)}</mark>
+      {text.slice(index + needle.length)}
+    </>
+  );
 }
 
 function formatIntentLabel(intent) {
